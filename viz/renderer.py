@@ -2,7 +2,8 @@ import pygame
 
 import config
 from env import *
-from viz import colors, sprites
+from . import colors
+from .sprites import Sprites
 
 
 class Renderer:
@@ -61,7 +62,7 @@ class Renderer:
                 NodeStatusState.VISITED: colors.NODE_VISITED,
             }.get(node.status, colors.NODE_UNVISITED)
             sx, sy = self._to_screen(*node.pos)
-            sprites.draw_node(self.surface, pygame.Vector2(sx, sy), color)
+            Sprites.draw_node(self.surface, pygame.Vector2(sx, sy), color)
             label = self._font_small.render(
                 f"({node.pos[0]}, {node.pos[1]})", True, (140, 140, 160)
             )
@@ -70,7 +71,7 @@ class Renderer:
     def _draw_depot(self, depot: DepotState):
         if depot is None:
             return
-        sprites.draw_depot(self.surface, self._to_screen(*depot.pos), colors.NODE_DEPOT)
+        Sprites.draw_depot(self.surface, self._to_screen(*depot.pos), colors.NODE_DEPOT)
 
     def _draw_trucks(self, trucks: list[TruckState]):
         for i, truck in enumerate(trucks):
@@ -78,14 +79,14 @@ class Renderer:
             broken = truck.status == TruckStatusState.BROKEN
             if broken:
                 color = colors.TRUCK_BROKEN
-            sprites.draw_truck(
+            Sprites.draw_truck(
                 self.surface, self._to_screen(*truck.pos), color, broken=broken
             )
             self._draw_load_bar(*truck.pos, truck.rel_load, color)
 
     def _draw_load_bar(self, px, py, fraction, color):
         sx, sy = self._to_screen(px, py)
-        bar_w, bar_h = 30, 6
+        bar_w, bar_h = 40, 9
         bx, by = sx - bar_w // 2, sy + 20
         pygame.draw.rect(self.surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
         fill_w = int(bar_w * min(max(fraction, 0), 1))
