@@ -1,33 +1,31 @@
 from pygame import Color
 
 # Node states
-NODE_UNVISITED: Color = Color(220, 80, 60)  # warm red — orphan / unassigned
-NODE_ASSIGNED: Color = Color(60, 160, 120)  # teal — in a planned route
-NODE_DEPOT: Color = Color(80, 80, 200)  # blue — depot
-NODE_VISITED: Color = Color(160, 160, 160)  # gray — already collected
+NODE_UNVISITED: Color = Color(230, 90, 70)  # soft red — unassigned
+NODE_ASSIGNED: Color = Color(70, 150, 130)  # teal — planned
+NODE_DEPOT: Color = Color(70, 90, 210)  # blue — depot
+NODE_VISITED: Color = Color(190, 190, 190)  # light gray — visited
 
 # Trucks
-TRUCK_ACTIVE: Color = Color(240, 200, 60)  # amber
-TRUCK_BROKEN: Color = Color(120, 120, 120)  # gray
-TRUCK_RECOVERING: Color = Color(180, 140, 220)  # purple
+TRUCK_BROKEN: Color = Color(170, 170, 170)  # mid gray
 
-# Route lines — one per truck, cycle through these
+# Route lines — slightly darker for visibility on white
 ROUTE_PALETTE: list[Color] = [
-    Color(80, 160, 240),
-    Color(80, 220, 140),
-    Color(240, 140, 80),
-    Color(200, 80, 200),
-    Color(80, 200, 220),
-    Color(220, 200, 80),
+    Color(60, 140, 220),
+    Color(60, 180, 120),
+    Color(220, 120, 60),
+    Color(180, 70, 180),
+    Color(60, 170, 190),
+    Color(200, 170, 60),
 ]
 
 # HUD
-HUD_BG: Color = Color(20, 20, 30, 200)  # RGBA, semi-transparent panel
-HUD_TEXT: Color = Color(220, 220, 220)
-HUD_BAR_BG: Color = Color(60, 60, 70)
-HUD_BAR_FILL: Color = Color(80, 180, 120)
-HUD_BAR_HIGH: Color = Color(240, 160, 60)  # membership bar when value > 0.7
+HUD_BG: Color = Color(255, 255, 255, 230)  # semi-transparent white
+HUD_TEXT: Color = Color(40, 40, 50)
+HUD_BAR_BG: Color = Color(220, 220, 230)
+HUD_BAR_FILL: Color = Color(90, 170, 130)
+HUD_BAR_HIGH: Color = Color(230, 140, 60)
 
 # Background
-BACKGROUND: Color = Color(15, 15, 25)
-GRID: Color = Color(30, 30, 45)
+BACKGROUND: Color = Color(245, 246, 250)  # off-white (easier on eyes than pure white)
+GRID: Color = Color(210, 210, 220)

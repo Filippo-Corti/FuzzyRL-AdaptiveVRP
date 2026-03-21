@@ -1,5 +1,6 @@
 import pygame
 
+import config
 from env import *
 from viz import colors, sprites
 
@@ -16,15 +17,18 @@ class Renderer:
         """
         self.surface = surface
         self.rect = graph_rect
+        self._font_small: pygame.font.Font = pygame.font.SysFont(
+            "monospace", config.FONT_SIZE_SMALL
+        )
 
     def draw(self, render_state: SimulationState):
         """
         render_state contains a snapshot of the state of the simulation
         """
         self._draw_background()
+        self._draw_routes(render_state.routes)
         self._draw_nodes(render_state.nodes)
         self._draw_edges(render_state.edges)
-        self._draw_routes(render_state.routes)
         self._draw_depot(render_state.depot)
         self._draw_trucks(render_state.trucks)
 
@@ -56,7 +60,12 @@ class Renderer:
                 NodeStatusState.ASSIGNED: colors.NODE_ASSIGNED,
                 NodeStatusState.VISITED: colors.NODE_VISITED,
             }.get(node.status, colors.NODE_UNVISITED)
-            sprites.draw_node(self.surface, self._to_screen(*node.pos), color)
+            sx, sy = self._to_screen(*node.pos)
+            sprites.draw_node(self.surface, pygame.Vector2(sx, sy), color)
+            label = self._font_small.render(
+                f"({node.pos[0]}, {node.pos[1]})", True, (140, 140, 160)
+            )
+            self.surface.blit(label, (sx + 15, sy + 15))
 
     def _draw_depot(self, depot: DepotState):
         if depot is None:
@@ -64,13 +73,11 @@ class Renderer:
         sprites.draw_depot(self.surface, self._to_screen(*depot.pos), colors.NODE_DEPOT)
 
     def _draw_trucks(self, trucks: list[TruckState]):
-        for truck in trucks:
-            color = {
-                TruckStatusState.ACTIVE: colors.TRUCK_ACTIVE,
-                TruckStatusState.BROKEN: colors.TRUCK_BROKEN,
-                TruckStatusState.RECOVERING: colors.TRUCK_RECOVERING,
-            }.get(truck.status, colors.TRUCK_ACTIVE)
+        for i, truck in enumerate(trucks):
+            color = colors.ROUTE_PALETTE[i % len(colors.ROUTE_PALETTE)]
             broken = truck.status == TruckStatusState.BROKEN
+            if broken:
+                color = colors.TRUCK_BROKEN
             sprites.draw_truck(
                 self.surface, self._to_screen(*truck.pos), color, broken=broken
             )
@@ -78,8 +85,8 @@ class Renderer:
 
     def _draw_load_bar(self, px, py, fraction, color):
         sx, sy = self._to_screen(px, py)
-        bar_w, bar_h = 20, 4
-        bx, by = sx - bar_w // 2, sy + 13
+        bar_w, bar_h = 30, 6
+        bx, by = sx - bar_w // 2, sy + 20
         pygame.draw.rect(self.surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
         fill_w = int(bar_w * min(max(fraction, 0), 1))
         if fill_w > 0:

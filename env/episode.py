@@ -19,36 +19,55 @@ class VRPEnvironment:
         """
         return SimulationState(
             nodes=[
-                NodeState(id=0, pos=(0.2, 0.3), status=NodeStatusState.UNVISITED),
+                NodeState(id=0, pos=(0.2, 0.3), status=NodeStatusState.ASSIGNED),
                 NodeState(id=1, pos=(0.5, 0.6), status=NodeStatusState.ASSIGNED),
-                NodeState(id=2, pos=(0.7, 0.2), status=NodeStatusState.VISITED),
-                NodeState(id=3, pos=(0.4, 0.8), status=NodeStatusState.UNVISITED),
+                NodeState(id=2, pos=(0.7, 0.2), status=NodeStatusState.ASSIGNED),
+                NodeState(id=3, pos=(0.4, 0.8), status=NodeStatusState.ASSIGNED),
                 NodeState(id=4, pos=(0.8, 0.7), status=NodeStatusState.ASSIGNED),
+                NodeState(id=5, pos=(0.3, 0.7), status=NodeStatusState.ASSIGNED),
+                NodeState(id=6, pos=(0.2, 0.6), status=NodeStatusState.ASSIGNED),
+                NodeState(id=7, pos=(0.7, 0.6), status=NodeStatusState.ASSIGNED),
+                NodeState(id=8, pos=(0.5, 0.9), status=NodeStatusState.ASSIGNED),
+                NodeState(id=9, pos=(0.1, 0.8), status=NodeStatusState.ASSIGNED),
+                NodeState(id=10, pos=(0.3, 0.3), status=NodeStatusState.ASSIGNED),
+                NodeState(id=11, pos=(0.1, 0.7), status=NodeStatusState.ASSIGNED),
+                NodeState(id=12, pos=(0.7, 0.1), status=NodeStatusState.ASSIGNED),
+                NodeState(id=13, pos=(0.4, 0.8), status=NodeStatusState.ASSIGNED),
             ],
-            edges=[
-                EdgeState(id=0, pos1=(0.2, 0.3), pos2=(0.5, 0.6)),
-                EdgeState(id=1, pos1=(0.5, 0.6), pos2=(0.7, 0.2)),
-                EdgeState(id=2, pos1=(0.7, 0.2), pos2=(0.4, 0.8)),
-                EdgeState(id=3, pos1=(0.4, 0.8), pos2=(0.8, 0.7)),
-                EdgeState(id=4, pos1=(0.8, 0.7), pos2=(0.2, 0.3)),
-            ],
+            edges=[],  # Fully connected
             trucks=[
                 TruckState(
-                    id=0, pos=(0.2, 0.3), status=TruckStatusState.ACTIVE, rel_load=0.4
+                    id=0, pos=(0.2, 0.3), status=TruckStatusState.ACTIVE, rel_load=0.7
                 ),
                 TruckState(
-                    id=1, pos=(0.5, 0.6), status=TruckStatusState.BROKEN, rel_load=0.0
+                    id=1, pos=(0.5, 0.6), status=TruckStatusState.ACTIVE, rel_load=0.5
                 ),
                 TruckState(
                     id=2,
                     pos=(0.7, 0.2),
-                    status=TruckStatusState.RECOVERING,
-                    rel_load=0.0,
+                    status=TruckStatusState.ACTIVE,
+                    rel_load=0.2,
                 ),
             ],
             routes=[
-                [(0.5, 0.5), (0.2, 0.3), (0.5, 0.6)],
-                [(0.5, 0.5), (0.7, 0.2)],
+                [
+                    (0.5, 0.5),
+                    (0.3, 0.3),
+                    (0.2, 0.3),
+                    (0.2, 0.6),
+                    (0.1, 0.7),
+                    (0.3, 0.7),
+                    (0.5, 0.5),
+                ],
+                [
+                    (0.5, 0.5),
+                    (0.5, 0.6),
+                    (0.4, 0.8),
+                    (0.5, 0.9),
+                    (0.8, 0.7),
+                    (0.5, 0.5),
+                ],
+                [(0.5, 0.5), (0.7, 0.2), (0.7, 0.1), (0.5, 0.5)],
             ],
             depot=DepotState(pos=(0.5, 0.5)),
             stats=SimulationStats(
