@@ -1,6 +1,8 @@
 import pygame
-from viz.renderer import Renderer
-from viz.hud import HUD
+
+from .sprites import Sprites
+from .renderer import Renderer
+from .hud import HUD
 
 import config
 
@@ -16,6 +18,7 @@ def run(env, agent):  # TODO: add typing
     screen = pygame.display.set_mode((config.WINDOW_W, config.WINDOW_H))
     pygame.display.set_caption("VRP Fuzzy Q-Learning")
     clock = pygame.time.Clock()
+    Sprites.init()
 
     graph_rect = pygame.Rect(0, 0, config.GRAPH_W, config.WINDOW_H)
     hud_rect = pygame.Rect(config.GRAPH_W, 0, config.HUD_W, config.WINDOW_H)
