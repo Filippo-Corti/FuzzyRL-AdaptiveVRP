@@ -108,21 +108,17 @@ All actions are defined at the level of a single truck. The agent chooses one pe
 - Do nothing — the truck skips its turn. This action is always available and is crucial for enabling anticipatory
   behaviour: an agent that learns to wait for a recovering truck rather than expensively absorbing its orphans has
   discovered something non-trivial.
-- Insert nearest orphan via cheapest insertion — the heuristic finds the position in this truck's current planned route
-  where inserting the nearest orphaned node adds the least additional distance. Fast and greedy, appropriate under
-  severe disruption when coverage matters more than optimality.
-- Insert nearest orphan via regret insertion — the heuristic assigns the orphaned node whose cost of not assigning it to
-  this truck would be highest relative to alternatives. More expensive to compute but produces better-balanced
-  assignments across the fleet.
-- 2-opt on this truck's route — the heuristic finds the single best improving 2-opt swap across all pairs of edges in
-  this truck's planned route and applies it. If no improving swap exists the action has no effect. Reduces route
-  distance without changing which nodes belong to this truck. Appropriate when the state is stable and the agent is in
-  improvement mode.
-- Swap a node with the most overloaded truck — the heuristic identifies the node in the most overloaded active truck
-  whose removal saves that truck the most distance, then inserts it into this truck's route at the cheapest position.
-  Rebalances load across the fleet without creating orphans.
+- Insert — the heuristic finds the position in this truck's current planned route where inserting the nearest orphaned
+  node adds the least additional distance. Fast and greedy, appropriate under severe disruption when coverage matters
+  more than optimality.
+- Remove — the heuristic identifies the node in this truck's current planned route whose removal yields the greatest
+  reduction in route distance and drops it, making it an orphan. Appropriate when the truck carries a geometrically
+  poor node that would be better served by another truck.
+- 2-opt — the heuristic finds the single best improving 2-opt swap across all pairs of edges in this truck's planned
+  route and applies it. If no improving swap exists the action has no effect. Reduces route distance without changing
+  which nodes belong to this truck. Appropriate when the state is stable and the agent is in improvement mode.
 
-The agent never chooses which specific node to insert or swap. The heuristic determines that internally using
+The agent never chooses which specific node to insert or remove. The heuristic determines that internally using
 deterministic procedures. The agent only decides which type of operation to invoke.
 
 ## Action Masking

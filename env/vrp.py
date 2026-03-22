@@ -40,12 +40,15 @@ class VRPEnvironment:
 
         # Perform an action each with uniform probability: nearest insertion, 2-opt, do nothing
         p = random.random()
-        if p < 1 / 3:
+        if p < 4 / 10:
             self.nearest_insertion(truck)
             self.last_action = "Nearest Insertion"
-        elif p < 2 / 3:
+        elif p < 6 / 10:
             self.two_opt(truck)
             self.last_action = "2-opt"
+        elif p < 8 / 10:
+            self.remove_costliest(truck)
+            self.last_action = "Remove Costliest"
         else:
             self.last_action = "Do Nothing"
 
@@ -145,6 +148,33 @@ class VRPEnvironment:
         # Reinsert them between A and D
         for id in truck_route[idx_B : idx_C + 1]:
             truck.add_after(id, A.id)
+
+    def remove_costliest(self, truck: Truck):
+        """
+        Performs removal on the given truck's route.
+        The heuristic identifies the node in this truck's current planned route whose removal yields the greatest
+        reduction in route distance and drops it, making it an orphan. Appropriate when the truck carries a
+        geometrically poor node that would be better served by another truck.
+        """
+        route = self.get_route(truck.id)
+
+        if truck.route_size == 0:
+            return
+
+        best_node = None
+        best_gain = 0.0
+
+        for A, B, C in zip(route, route[1:], route[2:]):
+            gain = A.distance_to(B) + B.distance_to(C) - A.distance_to(C)
+            if gain > best_gain:
+                best_gain = gain
+                best_node = B
+
+        if best_node is None:
+            return
+
+        truck.remove_by_id(best_node.id)
+        best_node.assignment = None
 
     def get_render_state(self) -> SimulationSnapshot:
         """
