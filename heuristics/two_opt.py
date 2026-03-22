@@ -7,7 +7,7 @@ from heuristics.heuristic import Heuristic
 class TwoOpt(Heuristic):
 
     @staticmethod
-    def can_handle(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
         if truck.route_size < 3:
             return False
         return True
@@ -64,3 +64,7 @@ class TwoOpt(Heuristic):
         # Reinsert them between A and D
         for id in truck_route[b_idx : c_idx + 1]:
             truck.add_after(id, a.id)
+
+    @staticmethod
+    def name() -> str:
+        return "2-opt"

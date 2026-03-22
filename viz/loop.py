@@ -1,5 +1,6 @@
 import pygame
 
+from agent import VRPAgent
 from env import VRPEnvironment
 from .sprites import Sprites
 from .renderer import Renderer
@@ -8,7 +9,7 @@ from .hud import HUD
 import config
 
 
-def run(env: VRPEnvironment, agent):  # TODO: add typing
+def run(env: VRPEnvironment, agent: VRPAgent):
     """
     env   — your environment object (must expose get_render_state and get_stats)
     agent — your agent object (must expose step and get_render_info)

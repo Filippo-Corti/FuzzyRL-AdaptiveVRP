@@ -68,18 +68,12 @@ class Renderer:
             if broken:
                 color = colors.TRUCK_BROKEN
             Sprites.draw_truck(
-                self.surface, self._to_screen(*truck.pos), color, broken=broken
+                self.surface,
+                self._to_screen(*truck.pos),
+                color,
+                broken=broken,
+                fraction=truck.rel_load,
             )
-            self._draw_load_bar(*truck.pos, truck.rel_load, color)
-
-    def _draw_load_bar(self, px, py, fraction, color):
-        sx, sy = self._to_screen(px, py)
-        bar_w, bar_h = 40, 9
-        bx, by = sx - bar_w // 2, sy + 20
-        pygame.draw.rect(self.surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
-        fill_w = int(bar_w * min(max(fraction, 0), 1))
-        if fill_w > 0:
-            pygame.draw.rect(self.surface, color, (bx, by, fill_w, bar_h))
 
     def _to_screen(self, nx: float, ny: float, margin: int = 100) -> pygame.Vector2:
         """Map normalised node coordinates [0,1]×[0,1] to screen pixels, leaving a margin."""

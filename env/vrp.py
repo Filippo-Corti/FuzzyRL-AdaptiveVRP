@@ -1,7 +1,8 @@
 import math
-import random
-from itertools import pairwise, combinations
+from itertools import pairwise
 
+from agent.agent import VRPAgent
+from heuristics.heuristic import Heuristic
 from .graph import VRPNode, VRPGraph
 from .snapshot import *
 from .truck import Truck
@@ -9,7 +10,7 @@ from .truck import Truck
 
 class VRPEnvironment:
 
-    def __init__(self, graph: VRPGraph):
+    def __init__(self, graph: VRPGraph, heuristics: list[type[Heuristic]]):
         self.graph = graph
         self.trucks: dict[int, Truck] = {}
         self.truck_ids: list[int] = []
@@ -19,6 +20,7 @@ class VRPEnvironment:
         self.lowest_cost: float = math.inf
         self.last_cost: float = math.inf
         self.steps = 0
+        self.actions: dict[str, type[Heuristic]] = {h.name(): h for h in heuristics}
 
     def add_truck(self, truck: Truck):
         assert truck.id not in self.trucks
@@ -33,7 +35,7 @@ class VRPEnvironment:
             + [self.graph.depot]
         )
 
-    def step(self, agent):
+    def step(self, agent: VRPAgent):
         """
         Runs one step of the simulation of the environment
         """
@@ -50,143 +52,16 @@ class VRPEnvironment:
 
         truck = self.trucks[self.truck_ids[self.current_truck_idx]]
 
-        # Perform an action each with uniform probability: nearest insertion, 2-opt, do nothing
-        p = random.random()
-        if p < 5 / 10:
-            self.nearest_insertion(truck)
-            self.last_action = "Nearest Insertion"
-        elif p < 7 / 10:
-            self.two_opt(truck)
-            self.last_action = "2-opt"
-        elif p < 9 / 10:
-            self.remove_costliest(truck)
-            self.last_action = "Remove Costliest"
-        else:
-            self.last_action = "Do Nothing"
+        available_actions = [
+            k for k, v in self.actions.items() if v.is_applicable(self, truck)
+        ]
+
+        action = agent.select_action(self, truck, available_actions)
+        self.last_action = action
+        self.actions[action].apply(self, truck)
 
         self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
         self.steps += 1
-
-    def nearest_insertion(self, truck: Truck):
-        """
-        Performs nearest insertion on the given truck's route.
-        The heuristic finds the position in this truck's current planned route where inserting the nearest
-        orphaned node adds the least additional distance. Fast and greedy, appropriate under severe disruption
-        when coverage matters more than optimality.
-        """
-        route = self.get_route(truck.id)
-
-        unassigned_nodes = list(self.graph.unassigned_nodes())
-        if truck.is_full or not unassigned_nodes:
-            return
-
-        nearest_node = min(  # Find the argmin
-            unassigned_nodes,  # Among all unassigned nodes
-            key=lambda unassigned: min(
-                node.distance_to(unassigned) for node in route
-            ),  # Based on the min distance to any other in the route
-        )
-
-        nearest_insertion = min(  # Find the argmin
-            pairwise(route),  # Among all pairs of nodes in the route
-            key=lambda pair: pair[0].distance_to(nearest_node)
-            + nearest_node.distance_to(pair[1])
-            - pair[0].distance_to(pair[1]),  # Based on the insertion cost
-        )
-
-        # I should be careful with the depot unfortunately
-        if nearest_insertion[0].id == self.graph.depot.id:
-            truck.add_by_index(nearest_node.id, 0)  # Add at the start
-        else:
-            truck.add_after(nearest_node.id, nearest_insertion[0].id)
-
-        # Either way, we need to assign the node to the truck
-        nearest_node.assignment = truck.id
-
-    def two_opt(self, truck: Truck):
-        """
-        Performs 2-opt on the given truck's route.
-        The heuristic finds the single best improving 2-opt swap across all pairs of edges in this truck's planned
-        route and applies it. If no improving swap exists the action has no effect. Reduces route distance without
-        changing which nodes belong to this truck. Appropriate when the state is stable and the agent is in
-        improvement mode.
-        """
-
-        # I should iterate over all pairwise nodes in the route
-        # Two times nested
-        # And I should check what the improvement for making the swap would be (this is easy cause symmetric)
-        # Then, I find the max improvement --> (A, B) and (C. D) should be swapped
-        # To adopt the change I should remove all nodes between B and C (inclusive) and reinsert them between A and D
-        # I should be careful with the depot unfortunately, but I can just exclude it from the swap candidates
-
-        route = self.get_route(truck.id)
-        edges = list(pairwise(route))
-
-        best_swap = None
-        best_improvement = 0.0
-
-        for (A, B), (C, D) in combinations(edges, r=2):
-            if A.id == self.graph.depot.id or D.id == self.graph.depot.id:
-                continue
-
-            # If they are adjacent, the swap would not change anything, so I can skip it
-            if B.id == C.id:
-                continue
-
-            improvement = (
-                A.distance_to(C)
-                + B.distance_to(D)
-                - A.distance_to(B)
-                - C.distance_to(D)
-            )
-
-            if improvement < best_improvement:
-                best_improvement = improvement
-                best_swap = (A, B, C, D)
-
-        if best_swap is None:
-            return
-        A, B, C, D = best_swap
-        # I should remove all nodes between B and C (inclusive) and reinsert them between A and D
-        # I can find the indices of B and C in the route and then do the operations on the truck route
-        truck_route = truck.route.copy()
-        idx_B = truck_route.index(B.id)
-        idx_C = truck_route.index(C.id)
-
-        # Remove nodes between B and C (inclusive)
-        for id in truck_route[idx_B : idx_C + 1]:
-            truck.remove_by_id(id)
-
-        # Reinsert them between A and D
-        for id in truck_route[idx_B : idx_C + 1]:
-            truck.add_after(id, A.id)
-
-    def remove_costliest(self, truck: Truck):
-        """
-        Performs removal on the given truck's route.
-        The heuristic identifies the node in this truck's current planned route whose removal yields the greatest
-        reduction in route distance and drops it, making it an orphan. Appropriate when the truck carries a
-        geometrically poor node that would be better served by another truck.
-        """
-        route = self.get_route(truck.id)
-
-        if truck.route_size == 0:
-            return
-
-        best_node = None
-        best_gain = 0.0
-
-        for A, B, C in zip(route, route[1:], route[2:]):
-            gain = A.distance_to(B) + B.distance_to(C) - A.distance_to(C)
-            if gain > best_gain:
-                best_gain = gain
-                best_node = B
-
-        if best_node is None:
-            return
-
-        truck.remove_by_id(best_node.id)
-        best_node.assignment = None
 
     def compute_total_distance(self) -> float:
         """

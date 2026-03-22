@@ -7,7 +7,7 @@ from heuristics.heuristic import Heuristic
 class NearestInsertion(Heuristic):
 
     @staticmethod
-    def can_handle(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
         if next(env.graph.unassigned_nodes(), None) is None:
             return False
         if truck.is_full:
@@ -47,3 +47,7 @@ class NearestInsertion(Heuristic):
             truck.add_after(nearest_node.id, nearest_insertion[0].id)
 
         nearest_node.assignment = truck.id
+
+    @staticmethod
+    def name() -> str:
+        return "Nearest Insertion"

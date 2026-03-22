@@ -1,5 +1,7 @@
 import pygame
 
+from . import colors
+
 
 class Sprites:
 
@@ -19,12 +21,21 @@ class Sprites:
         pos: pygame.Vector2,
         color: pygame.Color,
         broken: bool = False,
+        fraction: float = 0.0,
     ):
         x, y = int(pos.x), int(pos.y)
 
         tinted_sprite = cls.tint_image(cls.truck, color)
         rect = tinted_sprite.get_rect(center=(x, y))
         surface.blit(tinted_sprite, rect)
+
+        # Draw a bar on top of the truck to indicate load
+        bar_w, bar_h = 43, 26
+        bx, by = x - bar_w // 2 + 16, y - 13
+        pygame.draw.rect(surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
+        fill_w = int(bar_w * min(max(fraction, 0), 1))
+        if fill_w > 0:
+            pygame.draw.rect(surface, color, (bx, by, fill_w, bar_h))
 
     @classmethod
     def draw_depot(

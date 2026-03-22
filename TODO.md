@@ -2,7 +2,7 @@
 
 [X] Literature review
 [X] Graph + trucks + Pygame scaffold together
-[] Heuristics with visual before/after
+[X] Heuristics with visual before/after
 [] Disruption model with visual indicators
 [] Greedy baseline — watch it run visually, verify it looks sane
 [] Fuzzy system — print state to screen

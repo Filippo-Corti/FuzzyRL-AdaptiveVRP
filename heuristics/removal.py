@@ -5,7 +5,7 @@ from heuristics.heuristic import Heuristic
 class CostliestRemoval(Heuristic):
 
     @staticmethod
-    def can_handle(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
         if truck.route_size == 0:
             return False
         return True
@@ -35,3 +35,7 @@ class CostliestRemoval(Heuristic):
 
         truck.remove_by_id(best_node.id)
         best_node.assignment = None
+
+    @staticmethod
+    def name() -> str:
+        return "Costliest Removal"

@@ -5,7 +5,7 @@ from heuristics.heuristic import Heuristic
 class DoNothing(Heuristic):
 
     @staticmethod
-    def can_handle(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
         return True
 
     @staticmethod
@@ -14,3 +14,7 @@ class DoNothing(Heuristic):
         Performs nothing on the given truck's route. This heuristic is a no-op.
         """
         return
+
+    @staticmethod
+    def name() -> str:
+        return "Do Nothing"
