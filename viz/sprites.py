@@ -37,6 +37,15 @@ class Sprites:
         if fill_w > 0:
             pygame.draw.rect(surface, color, (bx, by, fill_w, bar_h))
 
+        # If broken, draw an X over the truck
+        if broken:
+            pygame.draw.line(
+                surface, colors.TRUCK_BROKEN, (bx, by), (bx + bar_w, by + bar_h), 3
+            )
+            pygame.draw.line(
+                surface, colors.TRUCK_BROKEN, (bx + bar_w, by), (bx, by + bar_h), 3
+            )
+
     @classmethod
     def draw_depot(
         cls,

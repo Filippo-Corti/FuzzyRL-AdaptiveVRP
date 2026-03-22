@@ -21,5 +21,7 @@ class VRPAgent:
         if "Nearest Insertion" in available_actions:
             return "Nearest Insertion"
 
-        # For now, we just select a random action from the available actions
-        return random.choice(available_actions)
+        if "2-opt" in available_actions:
+            return "2-opt"
+
+        return "Do Nothing"

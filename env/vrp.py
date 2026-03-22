@@ -1,11 +1,13 @@
 import math
+import random
 from itertools import pairwise
 
+import config
 from agent.agent import VRPAgent
 from heuristics.heuristic import Heuristic
 from .graph import VRPNode, VRPGraph
 from .snapshot import *
-from .truck import Truck
+from .truck import Truck, TruckStatus
 
 
 class VRPEnvironment:
@@ -42,15 +44,28 @@ class VRPEnvironment:
         if len(self.trucks) == 0:
             return
 
-        unassigned_nodes = list(self.graph.unassigned_nodes())
-        if not unassigned_nodes:
-            cost = self.compute_total_distance()
-            if cost < self.lowest_cost:
-                self.lowest_cost = cost
-                self.best_snapshot = self.get_render_state()
-            self.last_cost = cost
+        # Pick and execute action for the current truck
+        truck_id = self.truck_ids[self.current_truck_idx]
+        truck = self.trucks[truck_id]
 
-        truck = self.trucks[self.truck_ids[self.current_truck_idx]]
+        if truck.status == TruckStatus.BROKEN:
+            # If the truck is broken, we skip its turn and try to recover it with some probability
+            if (
+                random.random() < config.RECOVERY_PROB
+            ):  # 30% chance to recover each turn
+                truck.recover()
+            self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
+            self.steps += 1
+            return
+        else:
+            # With a certain probability, the truck might break down
+            if random.random() < config.DISRUPTION_PROB:
+                self.breakdown(truck_id)
+                self.current_truck_idx = (self.current_truck_idx + 1) % len(
+                    self.truck_ids
+                )
+                self.steps += 1
+                return
 
         available_actions = [
             k for k, v in self.actions.items() if v.is_applicable(self, truck)
@@ -60,6 +75,14 @@ class VRPEnvironment:
         self.last_action = action
         self.actions[action].apply(self, truck)
 
+        # Update counters and stats
+        unassigned_nodes = list(self.graph.unassigned_nodes())
+        if not unassigned_nodes:
+            cost = self.compute_total_distance()
+            if cost < self.lowest_cost:
+                self.lowest_cost = cost
+                self.best_snapshot = self.get_render_state()
+            self.last_cost = cost
         self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
         self.steps += 1
 
@@ -74,6 +97,15 @@ class VRPEnvironment:
                 A.distance_to(B) for A, B in pairwise(route)
             )  # Sum of distances between consecutive nodes in the route
         return total_distance
+
+    def breakdown(self, truck_id: int):
+        """
+        Breaks down the truck with the given id, making it unavailable for a certain number of steps and unassigning its nodes
+        """
+        truck = self.trucks[truck_id]
+        for node_id in truck.route:
+            self.graph.get_node(node_id).assignment = None
+        truck.breakdown()
 
     def get_render_state(self) -> SimulationSnapshot:
         """

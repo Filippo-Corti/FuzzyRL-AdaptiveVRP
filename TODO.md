@@ -3,10 +3,11 @@
 [X] Literature review
 [X] Graph + trucks + Pygame scaffold together
 [X] Heuristics with visual before/after
-[] Disruption model with visual indicators
-[] Greedy baseline — watch it run visually, verify it looks sane
+[X] Disruption model with visual indicators
+[X] Greedy baseline — watch it run visually, verify it looks sane
+[] Q-learning agent without fuzzy — watch it learn visually, verify it looks sane
 [] Fuzzy system — print state to screen
-[] Q-learning — live reward plot
+[] Q-learning + fuzzy — live reward plot
 [] Eligibility traces + adaptive memberships
 [] Evaluation and ablation study
 

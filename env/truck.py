@@ -60,6 +60,7 @@ class Truck:
 
     def breakdown(self):
         self.status = TruckStatus.BROKEN
+        self.route = list()
 
     def recover(self):
         self.status = TruckStatus.ACTIVE
