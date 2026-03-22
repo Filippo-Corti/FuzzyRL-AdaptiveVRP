@@ -9,16 +9,18 @@ class TruckStatus(Enum):
 
 class Truck:
 
-    def __init__(self, id: int, pos: tuple[float, float]):
+    def __init__(self, id: int, pos: tuple[float, float], capacity: int):
         """
         :param id: the id of the truck
         :param pos: the position of the truck, in [0,1]^2
+        :param capacity: the capacity of the truck
         """
         assert 0 <= pos[0] <= 1 and 0 <= pos[1] <= 1
         self.id = id
         self.pos = pos
         self.status = TruckStatus.ACTIVE
         self.route: list[int] = list()
+        self.capacity = capacity
 
     def add_to_route(self, node_id: int, idx: int | None = None):
         assert node_id not in self.route
@@ -38,8 +40,12 @@ class Truck:
         self.status = TruckStatus.ACTIVE
 
     @property
-    def route_size(self):
+    def route_size(self) -> int:
         return len(self.route)
+
+    @property
+    def load(self) -> float:
+        return self.route_size / self.capacity
 
     def __iter__(self) -> Iterable[int]:
         return iter(self.route)

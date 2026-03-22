@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Iterator
 
 
 class VRPNode:
@@ -35,12 +35,12 @@ class VRPNode:
         return self.assignment is not None
 
     def distance_to(self, other: "VRPNode") -> float:
-        return (self.x - other.x) ** 2 + (self.y - other.y) ** 2
+        return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
 
 
 class VRPGraph:
     """
-    The graph of the Vehicle Routing Problem
+    The **fully-connected** graph of the Vehicle Routing Problem
     """
 
     def __init__(self, depot: VRPNode):
@@ -57,7 +57,7 @@ class VRPGraph:
     def get_node(self, id: int) -> VRPNode:
         return self.nodes[id]
 
-    def __iter__(self) -> Iterable[VRPNode]:
+    def __iter__(self) -> Iterator[VRPNode]:
         return iter(self.nodes.values())
 
     def unassigned_nodes(self) -> Iterable[VRPNode]:

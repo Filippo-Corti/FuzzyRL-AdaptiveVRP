@@ -25,7 +25,7 @@ class HUD:
             "monospace", config.FONT_SIZE_SMALL
         )
 
-    def draw(self, render_state: SimulationState):
+    def draw(self, render_state: snapshot.SimulationSnapshot):
         """
         render_state contains a snapshot of the state of the simulation
         """
@@ -66,7 +66,7 @@ class HUD:
         )
         return y + config.FONT_SIZE + 5
 
-    def _draw_stats(self, stats: SimulationStats, y: float):
+    def _draw_stats(self, stats: snapshot.SimulationStats, y: float):
         lines = [
             ("Round", str(stats.round)),
             ("Orphans", f"{stats.orphans} / {stats.total_nodes}"),

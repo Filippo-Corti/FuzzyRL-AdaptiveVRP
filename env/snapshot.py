@@ -5,46 +5,39 @@ This is the state of the simulation that is provided by the environment to the v
 from dataclasses import dataclass
 from enum import Enum
 
-PositionState = tuple[float, float]
+PositionSnapshot = tuple[float, float]
 
 
-class NodeStatusState(Enum):
+class NodeStatusSnapshot(Enum):
     UNVISITED = 0
     ASSIGNED = 1
     VISITED = 2
 
 
-class TruckStatusState(Enum):
+class TruckStatusSnapshot(Enum):
     ACTIVE = 0
     BROKEN = 1
     RECOVERING = 2
 
 
 @dataclass
-class NodeState:
+class NodeSnapshot:
     id: int
-    pos: PositionState
-    status: NodeStatusState
+    pos: PositionSnapshot
+    status: NodeStatusSnapshot
 
 
 @dataclass
-class EdgeState:
+class TruckSnapshot:
     id: int
-    pos1: PositionState
-    pos2: PositionState
-
-
-@dataclass
-class TruckState:
-    id: int
-    pos: PositionState
-    status: TruckStatusState
+    pos: PositionSnapshot
+    status: TruckStatusSnapshot
     rel_load: float
 
 
 @dataclass
-class DepotState:
-    pos: PositionState
+class DepotSnapshot:
+    pos: PositionSnapshot
 
 
 @dataclass
@@ -59,7 +52,7 @@ class SimulationStats:
 
 
 @dataclass
-class AgentState:
+class AgentSnapshot:
     memberships: dict[str, dict[str, float]]
     q_values: dict[str, float]
     chosen_action: str
@@ -67,11 +60,10 @@ class AgentState:
 
 
 @dataclass
-class SimulationState:
-    nodes: list[NodeState]
-    edges: list[EdgeState]
-    trucks: list[TruckState]
-    routes: list[list[PositionState]]
-    depot: DepotState
+class SimulationSnapshot:
+    nodes: list[NodeSnapshot]
+    trucks: list[TruckSnapshot]
+    routes: list[list[PositionSnapshot]]
+    depot: DepotSnapshot
     stats: SimulationStats
-    agent_state: AgentState
+    agent_state: AgentSnapshot

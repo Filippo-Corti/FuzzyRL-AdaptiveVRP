@@ -1,27 +1,12 @@
-from .state import (
-    SimulationState,
-    NodeState,
-    EdgeState,
-    NodeStatusState,
-    PositionState,
-    TruckStatusState,
-    TruckState,
-    DepotState,
-    AgentState,
-    SimulationStats,
-)
+from . import snapshot
 from .vrp import VRPEnvironment
+from .graph import VRPNode, VRPGraph
+from .truck import Truck
 
 __all__ = [
-    "SimulationState",
-    "NodeState",
-    "EdgeState",
-    "NodeStatusState",
-    "PositionState",
-    "TruckStatusState",
-    "TruckState",
-    "DepotState",
-    "AgentState",
-    "SimulationStats",
+    "snapshot",
     "VRPEnvironment",
+    "VRPNode",
+    "VRPGraph",
+    "Truck",
 ]
