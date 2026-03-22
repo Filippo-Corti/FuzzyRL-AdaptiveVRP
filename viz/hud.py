@@ -78,6 +78,14 @@ class HUD:
             ("Ep. reward", f"{stats.episode_reward:.2f}"),
             ("Truck turn", f"{stats.truck_turn}"),
             ("Last action", stats.last_action),
+            (
+                "Best solution",
+                f"{stats.best_solution_distance:.1f}",
+            ),
+            (
+                "Last solution",
+                f"{stats.last_distance:.1f}",
+            ),
         ]
         for label, value in lines:
             self._draw_kv(label, value, self.rect.left, y)

@@ -31,6 +31,8 @@ def run(env: VRPEnvironment, agent):  # TODO: add typing
     step_once = False
     ms_since_tick = 0
 
+    sim = None
+
     while True:
         dt = clock.tick(config.FPS_CAP)
 
@@ -41,6 +43,10 @@ def run(env: VRPEnvironment, agent):  # TODO: add typing
                 return
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    if not paused:
+                        sim = env.best_snapshot
+                    else:
+                        sim = None
                     paused = not paused
                 if event.key == pygame.K_RIGHT and paused:
                     step_once = True  # single-step while paused
@@ -62,9 +68,13 @@ def run(env: VRPEnvironment, agent):  # TODO: add typing
 
         # ── Render ──────────────────────────────────────────────────
         screen.fill((0, 0, 0))
-        sim_state = env.get_render_state()
-        renderer.draw(sim_state)
-        hud.draw(sim_state)
+        if sim is not None:
+            renderer.draw(sim)
+            hud.draw(sim)
+        else:
+            sim_state = env.get_render_state()
+            renderer.draw(sim_state)
+            hud.draw(sim_state)
         _draw_overlay_hints(screen, paused)
         pygame.display.flip()
 

@@ -28,6 +28,7 @@ class Truck:
         If idx is None, it appends at the end
         """
         assert node_id not in self.route
+        assert not self.is_full
         if idx is None:
             self.route.append(node_id)
         else:
@@ -54,6 +55,7 @@ class Truck:
             node_id not in self.route
         ), f"Cannot add {node_id} to {self.route} because it's already there"
         assert prev_id in self.route
+        assert not self.is_full
         self.route.insert(self.route.index(prev_id) + 1, node_id)
 
     def breakdown(self):
@@ -72,7 +74,7 @@ class Truck:
 
     @property
     def is_full(self) -> bool:
-        return self.route_size == self.capacity
+        return self.route_size >= self.capacity
 
     def __iter__(self) -> Iterable[int]:
         return iter(self.route)

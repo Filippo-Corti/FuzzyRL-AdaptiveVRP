@@ -13,11 +13,13 @@ env = VRPEnvironment(graph=graph)
 
 depot_x, depot_y = graph.depot.pos
 
+print(f"Capacity: {config.TRUCK_CAPACITY}")
+
 for i in range(config.NUM_TRUCKS):
     env.add_truck(
         Truck(
             id=i,
-            pos=(depot_x, depot_y + 0.05 * (i + 1)),
+            pos=(depot_x, depot_y + 0.04 * (i + 1)),
             capacity=config.TRUCK_CAPACITY,
         )
     )

@@ -51,6 +51,8 @@ class SimulationStats:
     episode_reward: float
     truck_turn: int
     last_action: str
+    best_solution_distance: float
+    last_distance: float
 
 
 @dataclass

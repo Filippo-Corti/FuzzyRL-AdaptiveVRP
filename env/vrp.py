@@ -15,6 +15,10 @@ class VRPEnvironment:
         self.truck_ids: list[int] = []
         self.current_truck_idx = 0
         self.last_action: str = ""
+        self.best_snapshot: SimulationSnapshot | None = None
+        self.lowest_cost: float = math.inf
+        self.last_cost: float = math.inf
+        self.steps = 0
 
     def add_truck(self, truck: Truck):
         assert truck.id not in self.trucks
@@ -36,24 +40,32 @@ class VRPEnvironment:
         if len(self.trucks) == 0:
             return
 
+        unassigned_nodes = list(self.graph.unassigned_nodes())
+        if not unassigned_nodes:
+            cost = self.compute_total_distance()
+            if cost < self.lowest_cost:
+                self.lowest_cost = cost
+                self.best_snapshot = self.get_render_state()
+            self.last_cost = cost
+
         truck = self.trucks[self.truck_ids[self.current_truck_idx]]
 
         # Perform an action each with uniform probability: nearest insertion, 2-opt, do nothing
         p = random.random()
-        if p < 4 / 10:
+        if p < 5 / 10:
             self.nearest_insertion(truck)
             self.last_action = "Nearest Insertion"
-        elif p < 6 / 10:
+        elif p < 7 / 10:
             self.two_opt(truck)
             self.last_action = "2-opt"
-        elif p < 8 / 10:
+        elif p < 9 / 10:
             self.remove_costliest(truck)
             self.last_action = "Remove Costliest"
         else:
             self.last_action = "Do Nothing"
 
         self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
-        return
+        self.steps += 1
 
     def nearest_insertion(self, truck: Truck):
         """
@@ -176,6 +188,18 @@ class VRPEnvironment:
         truck.remove_by_id(best_node.id)
         best_node.assignment = None
 
+    def compute_total_distance(self) -> float:
+        """
+        Computes the total distance of the current planned routes of all trucks
+        """
+        total_distance = 0.0
+        for truck_id in self.truck_ids:
+            route = self.get_route(truck_id)
+            total_distance += sum(
+                A.distance_to(B) for A, B in pairwise(route)
+            )  # Sum of distances between consecutive nodes in the route
+        return total_distance
+
     def get_render_state(self) -> SimulationSnapshot:
         """
         Returns a snapshot of the environment
@@ -217,7 +241,7 @@ class VRPEnvironment:
             routes=routes_ss,
             depot=depot_ss,
             stats=SimulationStats(
-                round=3,
+                round=self.steps,
                 orphans=2,
                 total_nodes=5,
                 total_trucks=3,
@@ -226,6 +250,8 @@ class VRPEnvironment:
                 episode_reward=-42.3,
                 last_action=self.last_action,
                 truck_turn=self.current_truck_idx,
+                best_solution_distance=self.lowest_cost,
+                last_distance=self.last_cost,
             ),
             agent_state=AgentSnapshot(
                 memberships={
