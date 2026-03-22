@@ -1,3 +1,7 @@
+"""
+This is the state of the simulation that is provided by the environment to the visualization package
+"""
+
 from dataclasses import dataclass
 from enum import Enum
 

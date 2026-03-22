@@ -1,22 +1,29 @@
+from .graph import VRPNode, VRPGraph
 from .state import *
+from .truck import Truck
 
 
 class VRPEnvironment:
 
-    def __init__(self):
-        pass
+    def __init__(self, graph: VRPGraph):
+        self.graph = graph
+        self.trucks = []
+
+    def add_truck(self, truck: Truck):
+        self.trucks.append(truck)
 
     def step(self, agent):
         """
-        Runs one step of the episode
+        Runs one step of the simulation of the environment
         """
-        return None
+        return
 
     def get_render_state(self) -> SimulationState:
         """
         Returns the current state of the environment
         :return: the state of the environment
         """
+
         return SimulationState(
             nodes=[
                 NodeState(id=0, pos=(0.2, 0.3), status=NodeStatusState.ASSIGNED),

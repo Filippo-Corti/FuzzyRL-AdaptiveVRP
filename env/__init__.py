@@ -10,7 +10,7 @@ from .state import (
     AgentState,
     SimulationStats,
 )
-from .episode import VRPEnvironment
+from .vrp import VRPEnvironment
 
 __all__ = [
     "SimulationState",
