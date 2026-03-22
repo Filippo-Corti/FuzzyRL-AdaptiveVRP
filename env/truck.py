@@ -22,16 +22,39 @@ class Truck:
         self.route: list[int] = list()
         self.capacity = capacity
 
-    def add_to_route(self, node_id: int, idx: int | None = None):
+    def add_by_index(self, node_id: int, idx: int | None = None):
+        """
+        Adds node_id in position idx to the truck route.
+        If idx is None, it appends at the end
+        """
         assert node_id not in self.route
         if idx is None:
             self.route.append(node_id)
         else:
             self.route.insert(idx, node_id)
 
-    def remove_from_route(self, node_id: int):
+    def remove_by_index(self, idx: int):
+        """
+        Removes node in position idx from the truck route
+        """
+        self.route.pop(idx)
+
+    def remove_by_id(self, node_id: int):
+        """
+        Removes node_id from the truck route
+        """
         assert node_id in self.route
         self.route.remove(node_id)
+
+    def add_after(self, node_id: int, prev_id: int):
+        """
+        Adds node_id after prev_id in the truck route
+        """
+        assert (
+            node_id not in self.route
+        ), f"Cannot add {node_id} to {self.route} because it's already there"
+        assert prev_id in self.route
+        self.route.insert(self.route.index(prev_id) + 1, node_id)
 
     def breakdown(self):
         self.status = TruckStatus.BROKEN
@@ -46,6 +69,10 @@ class Truck:
     @property
     def load(self) -> float:
         return self.route_size / self.capacity
+
+    @property
+    def is_full(self) -> bool:
+        return self.route_size == self.capacity
 
     def __iter__(self) -> Iterable[int]:
         return iter(self.route)

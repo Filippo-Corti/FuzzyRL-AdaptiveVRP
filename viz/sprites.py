@@ -32,13 +32,17 @@ class Sprites:
         surface: pygame.Surface,
         pos: pygame.Vector2,
         color: pygame.Color,
-        size_x: int = 60,
+        size_x: int = 70,
         size_y: int = 40,
     ):
         x, y = int(pos[0]), int(pos[1])
         rect = pygame.Rect(x - size_x // 2, y - size_y // 2, size_x, size_y)
         pygame.draw.rect(surface, color, rect, border_radius=3)
         pygame.draw.rect(surface, (255, 255, 255), rect, 2, border_radius=3)
+        font = pygame.font.SysFont("monospace", 16)
+        label = font.render("DEPOT", True, (255, 255, 255))
+        label_rect = label.get_rect(center=rect.center)
+        surface.blit(label, label_rect)
 
     @classmethod
     def draw_node(

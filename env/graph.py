@@ -1,4 +1,4 @@
-from typing import Iterable, Iterator
+from collections.abc import Iterator
 
 
 class VRPNode:
@@ -60,7 +60,7 @@ class VRPGraph:
     def __iter__(self) -> Iterator[VRPNode]:
         return iter(self.nodes.values())
 
-    def unassigned_nodes(self) -> Iterable[VRPNode]:
+    def unassigned_nodes(self) -> Iterator[VRPNode]:
         """
         Iterates over the unassigned nodes
         :return: the unassigned nodes
@@ -69,7 +69,7 @@ class VRPGraph:
             if not node.is_assigned:
                 yield node
 
-    def assigned_nodes(self, truck_id: int | None = None) -> Iterable[VRPNode]:
+    def assigned_nodes(self, truck_id: int | None = None) -> Iterator[VRPNode]:
         """
         Iterates over the nodes assigned to a truck, or to all trucks if truck_id is None
         :param truck_id: the id of the truck

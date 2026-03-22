@@ -49,6 +49,8 @@ class SimulationStats:
     active_trucks: int
     total_distance: float
     episode_reward: float
+    truck_turn: int
+    last_action: str
 
 
 @dataclass
