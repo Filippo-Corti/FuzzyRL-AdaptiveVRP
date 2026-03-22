@@ -1,7 +1,5 @@
 import pygame
 
-TRUCK_SPRITE = None
-
 
 class Sprites:
 

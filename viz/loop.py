@@ -29,7 +29,6 @@ def run(env, agent):  # TODO: add typing
     paused = False
     step_once = False
     ms_since_tick = 0
-    last_agent_info = None
 
     while True:
         dt = clock.tick(config.FPS_CAP)
@@ -56,7 +55,7 @@ def run(env, agent):  # TODO: add typing
                 step_once = False
 
                 # Run one full round: all active trucks act, then disruptions fire
-                last_agent_info = env.step(agent)
+                env.step(agent)
                 # env.step() calls agent.select_action() internally for each truck
                 # and returns the last truck's agent_info dict
 

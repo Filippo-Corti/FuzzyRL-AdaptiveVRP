@@ -52,7 +52,7 @@ class Renderer:
         for i, route in enumerate(routes):
             color = colors.ROUTE_PALETTE[i % len(colors.ROUTE_PALETTE)]
             screen_pts = [self._to_screen(*stop) for stop in route]
-            pygame.draw.lines(self.surface, color, False, screen_pts, 2)
+            pygame.draw.lines(self.surface, color, False, screen_pts, 4)
 
     def _draw_nodes(self, nodes: list[NodeState]):
         for node in nodes:
