@@ -83,8 +83,9 @@ def run(env: VRPEnvironment, agent: VRPAgent):
             plotter.update(
                 sim_state, agent_stats["epsilon"], int(agent_stats["q_table_size"])
             )
-        if tick % 500 == 0:
+        if tick % 5000 == 0:
             plotter.draw()
+            print(agent.q_table)
         _draw_overlay_hints(screen, paused)
         pygame.display.flip()
 

@@ -13,10 +13,10 @@ import config
 
 # Crisp bin definitions — (n_bins, min, max)
 BIN_DEFINITIONS: dict[str, list[float]] = {
-    "truck_load": [0.0, 0.25, 0.5, 0.75, 1.0],
-    "fleet_availability": [0.0, 0.33, 0.66, 1.0],
-    "orphan_pressure": [0.0, 0.25, 0.5, 0.75, 1.0],
-    "nearest_orphan_dist": [0.0, 0.33, 0.66, 1.0],
+    "truck_load": [0.0, 0.3, 0.5, 0.7, 0.9],
+    "fleet_availability": [0.0, 0.33, 0.6, 0.8, 1.0],
+    "orphan_pressure": [0.0, 0.2, 0.33, 0.5, 0.75],
+    "nearest_orphan_dist": [0.0, 0.10, 0.30, 0.5],
 }
 
 State = tuple[int, int, int, int]

@@ -11,6 +11,13 @@
 [] Eligibility traces + adaptive memberships
 [] Evaluation and ablation study
 
+Critical concerns:
+> Nearest orphan distance is effectively dead
+
+> With 5 trucks acting in sequence, disruptions firing randomly, and a global reward signal, the environment is
+> genuinely non-stationary from any single truck's perspective. The theoretical guarantees of Q-learning don't hold in
+> non-stationary environments, and fuzzy Q-learning inherits this limitation.
+
 ## Repository Structure
 
 vrp_fuzzy_rl/

@@ -24,6 +24,7 @@ class VRPEnvironment:
         self.last_cost: float = math.inf
         self.steps = 0
         self.actions: dict[str, type[Heuristic]] = {h.name(): h for h in heuristics}
+        self.last_raw_reward = 0.0
 
     def add_truck(self, truck: Truck):
         assert truck.id not in self.trucks
@@ -71,7 +72,8 @@ class VRPEnvironment:
         available_actions = [
             k for k, v in self.actions.items() if v.is_applicable(self, truck)
         ]
-
+        # if len(available_actions) > 1:
+        #     available_actions.remove("Do Nothing")
         action = agent.select_action(self.get_observation(truck), available_actions)
         self.last_action = action
         self.actions[action].apply(self, truck)
@@ -85,6 +87,8 @@ class VRPEnvironment:
         next_available_actions = [
             k for k, v in self.actions.items() if v.is_applicable(self, next_truck)
         ]
+        # if len(next_available_actions) > 1:
+        #     next_available_actions.remove("Do Nothing")
         agent.update(self.get_observation(next_truck), reward, next_available_actions)
 
         # Update counters and stats
@@ -125,21 +129,35 @@ class VRPEnvironment:
         Reward function is:
         R = -total_distance - λ · unvisited_nodes - μ · imbalance$
         """
+        current = self._compute_raw_reward()
+        reward = current - self.last_raw_reward
+        self.last_raw_reward = current
+        return reward
+
+    def _compute_raw_reward(self) -> float:
         total_distance = self.compute_total_distance()
         unvisited_nodes = list(self.graph.unassigned_nodes())
-        imbalance = 0.0
+        imbalance = self._compute_imbalance()
 
-        # The average distance between two nodes in the unit square is approximately 0.52, so we can use this as a normalisation factor for the imbalance
         lambda_weight = 10.0
-
-        # Idk why this
-        mu_weight = total_distance / 4
+        mu_weight = 0.25  # imbalance is already in [0, 0.5] range so this is sufficient
 
         return (
             -total_distance
             - lambda_weight * len(unvisited_nodes)
             - mu_weight * imbalance
         )
+
+    def _compute_imbalance(self) -> float:
+        active_trucks = [
+            t for t in self.trucks.values() if t.status == TruckStatus.ACTIVE
+        ]
+        if len(active_trucks) < 2:
+            return 0.0
+        loads = [t.load for t in active_trucks]
+        mean = sum(loads) / len(loads)
+        variance = sum((l - mean) ** 2 for l in loads) / len(loads)
+        return variance**0.5
 
     def get_observation(self, truck: Truck) -> EnvObservation:
         """
