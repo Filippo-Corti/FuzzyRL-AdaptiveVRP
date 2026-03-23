@@ -107,3 +107,12 @@ class CrispQLearningAgent(VRPAgent):
             "epsilon": self.epsilon,
             "q_table_size": len(self.q_table),
         }
+
+    def print_q_table(self):
+        print("--------------------------------")
+        for (state, action), q in self.q_table.items():
+            state_str = ", ".join(
+                f"{list(BIN_DEFINITIONS.keys())[i]}: {s}" for i, s in enumerate(state)
+            )
+            print(f"State: {state_str}, Action: {action}, Q-value: {q:.2f}")
+        print("--------------------------------")

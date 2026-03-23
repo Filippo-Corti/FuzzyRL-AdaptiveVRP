@@ -130,6 +130,7 @@ class VRPEnvironment:
         R = -total_distance - λ · unvisited_nodes - μ · imbalance$
         """
         current = self._compute_raw_reward()
+        return current
         reward = current - self.last_raw_reward
         self.last_raw_reward = current
         return reward
@@ -137,27 +138,10 @@ class VRPEnvironment:
     def _compute_raw_reward(self) -> float:
         total_distance = self.compute_total_distance()
         unvisited_nodes = list(self.graph.unassigned_nodes())
-        imbalance = self._compute_imbalance()
 
-        lambda_weight = 10.0
-        mu_weight = 0.25  # imbalance is already in [0, 0.5] range so this is sufficient
+        lambda_weight = 2.0
 
-        return (
-            -total_distance
-            - lambda_weight * len(unvisited_nodes)
-            - mu_weight * imbalance
-        )
-
-    def _compute_imbalance(self) -> float:
-        active_trucks = [
-            t for t in self.trucks.values() if t.status == TruckStatus.ACTIVE
-        ]
-        if len(active_trucks) < 2:
-            return 0.0
-        loads = [t.load for t in active_trucks]
-        mean = sum(loads) / len(loads)
-        variance = sum((l - mean) ** 2 for l in loads) / len(loads)
-        return variance**0.5
+        return -total_distance - lambda_weight * len(unvisited_nodes)
 
     def get_observation(self, truck: Truck) -> EnvObservation:
         """
@@ -182,6 +166,12 @@ class VRPEnvironment:
             else None
         )
 
+        nearest_orphan_dist = (
+            min((node.distance_to(nearest_node) for node in self.get_route(truck.id)))
+            if nearest_node
+            else 0.0
+        )
+
         return EnvObservation(
             truck_load=truck.load,
             fleet_availability=(
@@ -191,10 +181,9 @@ class VRPEnvironment:
                 len(orphans) / len(self.graph.nodes) if self.graph.nodes else 0.0
             ),
             nearest_orphan_dist=(
-                nearest_node.distance_to(nearest_node) / math.sqrt(2)
-                if nearest_node
-                else 0.0
-            ),  # sqrt(2) is the max distance in the unit square
+                nearest_orphan_dist
+                / math.sqrt(2)  # sqrt(2) is the max distance in the unit square
+            ),
         )
 
     def get_render_state(self) -> SimulationSnapshot:
