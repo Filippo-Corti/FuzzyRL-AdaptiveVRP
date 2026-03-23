@@ -1,19 +1,17 @@
 from itertools import pairwise, combinations
 
 from env import VRPEnvironment, Truck
-from heuristics.heuristic import Heuristic
+from .heuristic import Heuristic, HeuristicAction
 
 
 class TwoOpt(Heuristic):
 
-    @staticmethod
-    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(self, env: VRPEnvironment, truck: Truck) -> bool:
         if truck.route_size < 3:
             return False
         return True
 
-    @staticmethod
-    def apply(env: VRPEnvironment, truck: Truck) -> None:
+    def apply(self, env: VRPEnvironment, truck: Truck) -> None:
         """
         Performs 2-opt on the given truck's route.
         The heuristic finds the single best improving 2-opt swap across all pairs of edges in this truck's planned
@@ -21,13 +19,11 @@ class TwoOpt(Heuristic):
         changing which nodes belong to this truck. Appropriate when the state is stable and the agent is in
         improvement mode.
         """
-        route = env.get_route(truck.id)
-
+        route = env.get_truck_route(truck.id)
         edges = list(pairwise(route))
 
         best_swap = None
         best_improvement = 0.0
-
         for (a, b), (c, d) in combinations(edges, r=2):
 
             # Exclude candidates that involve the depot
@@ -58,13 +54,12 @@ class TwoOpt(Heuristic):
         c_idx = truck_route.index(c.id)
 
         # Remove nodes between B and C (inclusive)
-        for id in truck_route[b_idx : c_idx + 1]:
-            truck.remove_by_id(id)
+        for tid in truck_route[b_idx : c_idx + 1]:
+            truck.remove_by_id(tid)
 
         # Reinsert them between A and D
-        for id in truck_route[b_idx : c_idx + 1]:
-            truck.add_after(id, a.id)
+        for tid in truck_route[b_idx : c_idx + 1]:
+            truck.add_after(tid, a.id)
 
-    @staticmethod
-    def name() -> str:
-        return "2-opt"
+    def name(self) -> HeuristicAction:
+        return HeuristicAction.TWO_OPT

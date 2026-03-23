@@ -2,8 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from collections import deque
 
-import config
-from env.snapshot import SimulationSnapshot
+from simulation.snapshot import SimulationSnapshot
 
 WINDOW = 500  # Rolling window size for smoothing
 
@@ -39,7 +38,7 @@ class MetricsPlotter:
     # Public API
     # ------------------------------------------------------------------
 
-    def update(self, snapshot: SimulationSnapshot, epsilon: float, q_table_size: int):
+    def update(self, snapshot: SimulationSnapshot):
         stats = snapshot.stats
         step = stats.round
 
@@ -48,10 +47,10 @@ class MetricsPlotter:
         self.orphans.append(stats.orphans)
         self.distances.append(stats.last_distance)
         self.best_distances.append(stats.best_solution_distance)
-        self.epsilons.append(epsilon)
-        self.q_table_sizes.append(q_table_size)
+        self.epsilons.append(snapshot.agent.epsilon)
+        self.q_table_sizes.append(snapshot.agent.q_table_size)
 
-        action = snapshot.agent_state.chosen_action
+        action = snapshot.agent.chosen_action
         if action not in self.action_counts:
             self.action_counts[action] = [0] * (len(self.steps) - 1)
         for a in self.action_counts:
@@ -165,11 +164,6 @@ class MetricsPlotter:
         ]:
             ax.tick_params(labelsize=8)
             ax.grid(True, alpha=0.3, linewidth=0.5)
-
-
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
 
 
 def _rolling_mean(values: list[float], window: int) -> list[float]:

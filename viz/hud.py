@@ -1,7 +1,7 @@
 import pygame
 
 import config
-from env import *
+from simulation import snapshot
 from viz import colors
 
 
@@ -32,14 +32,14 @@ class HUD:
         self._draw_panel_bg()
 
         env_stats = render_state.stats
-        agent_info = render_state.agent_state
+        agent_info = render_state.agent
 
         y = self.rect.top + config.FONT_SIZE
         y = self._draw_section_header("Episode stats", y)
         y = self._draw_stats(env_stats, y)
         y += config.FONT_SIZE
 
-        y = self._draw_section_header(f"Truck {agent_info.truck_id} — Fuzzy State", y)
+        y = self._draw_section_header(f"Truck {"N/A"} — Fuzzy State", y)
         y = self._draw_memberships(agent_info.memberships, y)
         y += config.FONT_SIZE
 
@@ -126,8 +126,8 @@ class HUD:
     def _draw_q_values(self, q_values: dict[str, float], chosen_action: str, y: float):
         """Horizontal bar per action, chosen action highlighted."""
         y += 10
-        min_q = min(q_values.values())
-        max_q = max(q_values.values())
+        min_q = min(q_values.values(), default=0.0)
+        max_q = max(q_values.values(), default=0.0)
         span = max_q - min_q if max_q != min_q else 1.0
         for action, q in q_values.items():
             norm = (q - min_q) / span

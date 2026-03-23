@@ -60,6 +60,10 @@ class VRPGraph:
     def __iter__(self) -> Iterator[VRPNode]:
         return iter(self.nodes.values())
 
+    @property
+    def is_fully_assigned(self) -> bool:
+        return all(node.is_assigned for node in self.nodes.values())
+
     def unassigned_nodes(self) -> Iterator[VRPNode]:
         """
         Iterates over the unassigned nodes

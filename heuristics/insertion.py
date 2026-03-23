@@ -1,29 +1,26 @@
 from itertools import pairwise
 
 from env import VRPEnvironment, Truck
-from heuristics.heuristic import Heuristic
+from .heuristic import Heuristic, HeuristicAction
 
 
 class NearestInsertion(Heuristic):
 
-    @staticmethod
-    def is_applicable(env: VRPEnvironment, truck: Truck) -> bool:
+    def is_applicable(self, env: VRPEnvironment, truck: Truck) -> bool:
         if next(env.graph.unassigned_nodes(), None) is None:
             return False
         if truck.is_full:
             return False
         return True
 
-    @staticmethod
-    def apply(env: VRPEnvironment, truck: Truck) -> None:
+    def apply(self, env: VRPEnvironment, truck: Truck) -> None:
         """
         Performs nearest insertion on the given truck's route.
         The heuristic finds the position in this truck's current planned route where inserting the nearest
         orphaned node adds the least additional distance. Fast and greedy, appropriate under severe disruption
         when coverage matters more than optimality.
         """
-        route = env.get_route(truck.id)
-
+        route = env.get_truck_route(truck.id)
         unassigned_nodes = list(env.graph.unassigned_nodes())
 
         nearest_node = min(  # Find the argmin
@@ -48,6 +45,5 @@ class NearestInsertion(Heuristic):
 
         nearest_node.assignment = truck.id
 
-    @staticmethod
-    def name() -> str:
-        return "Nearest Insertion"
+    def name(self) -> HeuristicAction:
+        return HeuristicAction.NEAREST_INSERTION

@@ -1,9 +1,9 @@
 import pygame
 
 import config
-from env import *
 from . import colors
 from .sprites import Sprites
+from simulation import snapshot
 
 
 class Renderer:
@@ -27,10 +27,10 @@ class Renderer:
         render_state contains a snapshot of the state of the simulation
         """
         self._draw_background()
-        self._draw_routes(render_state.routes)
-        self._draw_nodes(render_state.nodes)
-        self._draw_depot(render_state.depot)
-        self._draw_trucks(render_state.trucks)
+        self._draw_routes(render_state.environment.routes)
+        self._draw_nodes(render_state.environment.graph)
+        self._draw_depot(render_state.environment.depot)
+        self._draw_trucks(render_state.environment.trucks)
 
     def _draw_background(self):
         pygame.draw.rect(self.surface, colors.BACKGROUND, self.rect)

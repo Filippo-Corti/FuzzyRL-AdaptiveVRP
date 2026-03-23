@@ -60,14 +60,20 @@ class AgentSnapshot:
     memberships: dict[str, dict[str, float]]
     q_values: dict[str, float]
     chosen_action: str
-    truck_id: int
+    q_table_size: int
+    epsilon: float
+
+
+@dataclass
+class EnvironmentSnapshot:
+    graph: list[NodeSnapshot]
+    trucks: list[TruckSnapshot]
+    depot: DepotSnapshot
+    routes: list[list[PositionSnapshot]]
 
 
 @dataclass
 class SimulationSnapshot:
-    nodes: list[NodeSnapshot]
-    trucks: list[TruckSnapshot]
-    routes: list[list[PositionSnapshot]]
-    depot: DepotSnapshot
+    environment: EnvironmentSnapshot
+    agent: AgentSnapshot
     stats: SimulationStats
-    agent_state: AgentSnapshot

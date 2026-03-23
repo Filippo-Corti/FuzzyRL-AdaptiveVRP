@@ -1,7 +1,6 @@
 import pygame
 
-from agent import VRPAgent
-from env import VRPEnvironment
+from simulation import VRPSimulation
 from .plots import MetricsPlotter
 from .sprites import Sprites
 from .renderer import Renderer
@@ -10,10 +9,9 @@ from .hud import HUD
 import config
 
 
-def run(env: VRPEnvironment, agent: VRPAgent):
+def run(simulation: VRPSimulation):
     """
-    env   — your environment object (must expose get_render_state and get_stats)
-    agent — your agent object (must expose step and get_render_info)
+    Runs the simulation of the VRP environment with the given agent and renders it using Pygame.
     """
     pygame.init()
     pygame.font.init()
@@ -48,7 +46,7 @@ def run(env: VRPEnvironment, agent: VRPAgent):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     if not paused:
-                        sim = env.best_snapshot
+                        sim = simulation.best_snapshot
                     else:
                         sim = None
                     paused = not paused
@@ -58,17 +56,14 @@ def run(env: VRPEnvironment, agent: VRPAgent):
                     pygame.quit()
                     return
 
-        # ── Simulation tick ─────────────────────────────────────────
+        # ── Simulation tick ──────────────────────────────────────────
         if not paused or step_once:
             ms_since_tick += dt
             if ms_since_tick >= config.SIM_STEP_MS or step_once:
                 ms_since_tick = 0
                 step_once = False
 
-                # Run one full round: all active trucks act, then disruptions fire
-                env.step(agent)
-                # env.step() calls agent.select_action() internally for each truck
-                # and returns the last truck's agent_info dict
+                simulation.step()
 
         # ── Render ──────────────────────────────────────────────────
         screen.fill((0, 0, 0))
@@ -76,21 +71,14 @@ def run(env: VRPEnvironment, agent: VRPAgent):
             renderer.draw(sim)
             hud.draw(sim)
         else:
-            sim_state = env.get_render_state()
+            sim_state = simulation.get_snapshot()
             renderer.draw(sim_state)
             hud.draw(sim_state)
-            agent_stats = agent.get_stats()
-            plotter.update(
-                sim_state, agent_stats["epsilon"], int(agent_stats["q_table_size"])
-            )
+            plotter.update(sim_state)
         if tick % config.PLOT_EVERY == 0:
             plotter.draw()
-            agent.print_q_table()
         _draw_overlay_hints(screen, paused)
         pygame.display.flip()
-
-        if env.steps % config.DECAY_EVERY == 0:
-            agent.decay_epsilon()
 
         tick += 1
 

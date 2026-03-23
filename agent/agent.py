@@ -1,39 +1,43 @@
 from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from env import VRPEnvironment, Truck, EnvObservation
+    from env import EnvObservation
+    from heuristics import HeuristicAction
+    from simulation.snapshot import AgentSnapshot
 
-import random
 
-
-class VRPAgent:
+class VRPAgent(ABC):
 
     def __init__(self):
         pass
 
+    @abstractmethod
     def select_action(
-        self, observation: EnvObservation, available_actions: list[str]
-    ) -> str:
+        self, observation: EnvObservation, available_actions: list[HeuristicAction]
+    ) -> HeuristicAction:
         """
         Selects an action for the given truck based on the current state of the environment and the available actions.
         """
-        return random.choice(available_actions)
+        pass
 
-    def update(self, obs: EnvObservation, reward: float, available_actions: list[str]):
+    @abstractmethod
+    def update(
+        self,
+        obs: EnvObservation,
+        reward: float,
+        available_actions: list[HeuristicAction],
+    ):
         """
         Call this after the environment has transitioned as a result of the last select_action call.
         """
         pass
 
-    def get_stats(self) -> dict[str, float]:
+    @abstractmethod
+    def get_snapshot(self) -> AgentSnapshot:
         """
-        Return a dictionary of stats to be logged and plotted during training. This can include things like epsilon, q-table size, etc.
-        """
-        return {}
-
-    def decay_epsilon(self):
-        """
-        Decay the exploration rate (epsilon) after each episode. This is a no-op for agents that don't use epsilon-greedy action selection.
+        Returns a snapshot of the agent's internal state for visualization purposes.
         """
         pass
