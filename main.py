@@ -1,7 +1,7 @@
 import random
 
 import config
-from agent import VRPAgent
+from agent import VRPAgent, CrispQLearningAgent
 from env import VRPEnvironment, Truck
 from heuristics.do_nothing import DoNothing
 from heuristics.insertion import NearestInsertion
@@ -21,8 +21,6 @@ env = VRPEnvironment(
 
 depot_x, depot_y = graph.depot.pos
 
-print(f"Capacity: {config.TRUCK_CAPACITY}")
-
 for i in range(config.NUM_TRUCKS):
     env.add_truck(
         Truck(
@@ -32,6 +30,9 @@ for i in range(config.NUM_TRUCKS):
         )
     )
 
-agent = VRPAgent()
+# agent = VRPAgent()  # Default random agent
+agent = (
+    CrispQLearningAgent()
+)  # A simple Q-learning agent with crisp state representation
 
 run(env, agent)

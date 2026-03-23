@@ -5,6 +5,7 @@ from itertools import pairwise
 import config
 from agent.agent import VRPAgent
 from heuristics.heuristic import Heuristic
+from .observation import EnvObservation
 from .graph import VRPNode, VRPGraph
 from .snapshot import *
 from .truck import Truck, TruckStatus
@@ -71,9 +72,20 @@ class VRPEnvironment:
             k for k, v in self.actions.items() if v.is_applicable(self, truck)
         ]
 
-        action = agent.select_action(self, truck, available_actions)
+        action = agent.select_action(self.get_observation(truck), available_actions)
         self.last_action = action
         self.actions[action].apply(self, truck)
+
+        # Compute reward
+        reward = self.compute_reward()
+
+        # Advance to next truck before update
+        self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
+        next_truck = self.trucks[self.truck_ids[self.current_truck_idx]]
+        next_available_actions = [
+            k for k, v in self.actions.items() if v.is_applicable(self, next_truck)
+        ]
+        agent.update(self.get_observation(next_truck), reward, next_available_actions)
 
         # Update counters and stats
         unassigned_nodes = list(self.graph.unassigned_nodes())
@@ -83,7 +95,6 @@ class VRPEnvironment:
                 self.lowest_cost = cost
                 self.best_snapshot = self.get_render_state()
             self.last_cost = cost
-        self.current_truck_idx = (self.current_truck_idx + 1) % len(self.truck_ids)
         self.steps += 1
 
     def compute_total_distance(self) -> float:
@@ -106,6 +117,67 @@ class VRPEnvironment:
         for node_id in truck.route:
             self.graph.get_node(node_id).assignment = None
         truck.breakdown()
+
+    def compute_reward(self) -> float:
+        """
+        Computes the reward for the current state of the environment, based on the current planned routes and the number of unassigned nodes.
+
+        Reward function is:
+        R = -total_distance - λ · unvisited_nodes - μ · imbalance$
+        """
+        total_distance = self.compute_total_distance()
+        unvisited_nodes = list(self.graph.unassigned_nodes())
+        imbalance = 0.0
+
+        # The average distance between two nodes in the unit square is approximately 0.52, so we can use this as a normalisation factor for the imbalance
+        lambda_weight = 10.0
+
+        # Idk why this
+        mu_weight = total_distance / 4
+
+        return (
+            -total_distance
+            - lambda_weight * len(unvisited_nodes)
+            - mu_weight * imbalance
+        )
+
+    def get_observation(self, truck: Truck) -> EnvObservation:
+        """
+        Returns the current observation of the environment for the agent,
+        from the perspective of the given truck.
+        :return: the current observation of the environment
+        """
+        available_trucks = sum(
+            1 for t in self.trucks.values() if t.status != TruckStatus.BROKEN
+        )
+
+        orphans = list(self.graph.unassigned_nodes())
+
+        nearest_node = (
+            min(  # Find the argmin
+                orphans,  # Among all unassigned nodes
+                key=lambda unassigned: min(
+                    node.distance_to(unassigned) for node in self.get_route(truck.id)
+                ),  # Based on the min distance to any other in the route
+            )
+            if orphans
+            else None
+        )
+
+        return EnvObservation(
+            truck_load=truck.load,
+            fleet_availability=(
+                available_trucks / len(self.trucks) if self.trucks else 0.0
+            ),
+            orphan_pressure=(
+                len(orphans) / len(self.graph.nodes) if self.graph.nodes else 0.0
+            ),
+            nearest_orphan_dist=(
+                nearest_node.distance_to(nearest_node) / math.sqrt(2)
+                if nearest_node
+                else 0.0
+            ),  # sqrt(2) is the max distance in the unit square
+        )
 
     def get_render_state(self) -> SimulationSnapshot:
         """

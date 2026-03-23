@@ -2,6 +2,7 @@ import pygame
 
 from agent import VRPAgent
 from env import VRPEnvironment
+from .plots import MetricsPlotter
 from .sprites import Sprites
 from .renderer import Renderer
 from .hud import HUD
@@ -27,6 +28,7 @@ def run(env: VRPEnvironment, agent: VRPAgent):
 
     renderer = Renderer(screen, graph_rect)
     hud = HUD(screen, hud_rect)
+    plotter = MetricsPlotter()
 
     paused = False
     step_once = False
@@ -34,6 +36,7 @@ def run(env: VRPEnvironment, agent: VRPAgent):
 
     sim = None
 
+    tick = 0
     while True:
         dt = clock.tick(config.FPS_CAP)
 
@@ -76,8 +79,16 @@ def run(env: VRPEnvironment, agent: VRPAgent):
             sim_state = env.get_render_state()
             renderer.draw(sim_state)
             hud.draw(sim_state)
+            agent_stats = agent.get_stats()
+            plotter.update(
+                sim_state, agent_stats["epsilon"], int(agent_stats["q_table_size"])
+            )
+        if tick % 500 == 0:
+            plotter.draw()
         _draw_overlay_hints(screen, paused)
         pygame.display.flip()
+
+        tick += 1
 
 
 def _draw_overlay_hints(screen, paused):
