@@ -68,8 +68,7 @@ class MetricsPlotter:
         self._draw_actions()
         self._draw_qtable()
 
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
+        plt.pause(0.001)
 
     # ------------------------------------------------------------------
     # Private draw methods

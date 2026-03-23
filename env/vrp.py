@@ -221,12 +221,14 @@ class VRPEnvironment:
             depot=depot_ss,
             stats=SimulationStats(
                 round=self.steps,
-                orphans=2,
-                total_nodes=5,
-                total_trucks=3,
-                active_trucks=1,
-                total_distance=124.7,
-                episode_reward=-42.3,
+                orphans=len(list(self.graph.unassigned_nodes())),
+                total_nodes=len(self.graph.nodes),
+                total_trucks=len(self.trucks),
+                active_trucks=sum(
+                    1 for t in self.trucks.values() if t.status != TruckStatus.BROKEN
+                ),
+                total_distance=self.compute_total_distance(),
+                episode_reward=self.compute_reward(),
                 last_action=self.last_action,
                 truck_turn=self.current_truck_idx,
                 best_solution_distance=self.lowest_cost,
@@ -260,7 +262,7 @@ class VRPEnvironment:
                     "two_opt": -11.0,
                     "swap_overloaded": -10.2,
                 },
-                chosen_action="insert_nearest_cheapest",
+                chosen_action=self.last_action,
                 truck_id=0,
             ),
         )

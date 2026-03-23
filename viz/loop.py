@@ -88,6 +88,9 @@ def run(env: VRPEnvironment, agent: VRPAgent):
         _draw_overlay_hints(screen, paused)
         pygame.display.flip()
 
+        if env.steps % config.DECAY_EVERY == 0:
+            agent.decay_epsilon()
+
         tick += 1
 
 

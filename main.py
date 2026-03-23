@@ -10,6 +10,10 @@ from heuristics.two_opt import TwoOpt
 from utils import parse_vrp_instance
 from viz import run
 
+import matplotlib
+
+matplotlib.use("tkagg")
+
 # random.seed(10)
 
 graph = parse_vrp_instance(path="assets/datasets/CVRPLIB-Augerat-A/A-n32-k5.vrp")

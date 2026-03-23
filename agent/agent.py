@@ -31,3 +31,9 @@ class VRPAgent:
         Return a dictionary of stats to be logged and plotted during training. This can include things like epsilon, q-table size, etc.
         """
         return {}
+
+    def decay_epsilon(self):
+        """
+        Decay the exploration rate (epsilon) after each episode. This is a no-op for agents that don't use epsilon-greedy action selection.
+        """
+        pass
