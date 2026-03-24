@@ -12,11 +12,18 @@
 [] Evaluation and ablation study
 
 Critical concerns:
-> Nearest orphan distance is effectively dead
+> The state has no information about the truck's route quality. We should add a "route efficiency" that divides the
+> current route length by a lower-bound. This will help the agent learn to prefer better routes, and also give it a more
+> meaningful state representation.
 
-> With 5 trucks acting in sequence, disruptions firing randomly, and a global reward signal, the environment is
-> genuinely non-stationary from any single truck's perspective. The theoretical guarantees of Q-learning don't hold in
-> non-stationary environments, and fuzzy Q-learning inherits this limitation.
+> The state has no information about the truck's contribution when adding an orphan. We could express the relative
+> proximity to the nearest orphan, w.r.t. the other trucks.
+
+> We could add a new insertion heuristic that chooses the cheapest orphan.
+
+> Introducing Fuzzy Logic to the state
+
+> Introducing Eligibility Traces to learn n-step returns
 
 ## Repository Structure
 
