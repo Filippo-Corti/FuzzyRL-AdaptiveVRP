@@ -44,7 +44,8 @@ class VRPSimulation:
         if truck.status == TruckStatus.BROKEN:
             self.try_recovery(truck)
         else:
-            self.try_breakdown(truck)
+            breakdown = self.try_breakdown(truck)
+            self.agent.notify_of_disruption(breakdown)
 
         if truck.status == TruckStatus.BROKEN:
             self.next_step()
@@ -97,11 +98,15 @@ class VRPSimulation:
     def compute_reward(self, truck: Truck, delta_distance: float) -> float:
         """
         Computes the reward as:
-        R = -delta_distance - λ · unvisited_nodes
+        R = -delta_distance - λ · unvisited_nodes - γ · crossings
         """
         orphans = list(self.environment.graph.unassigned_nodes())
-        lambda_weight = 2.0
-        return -delta_distance - lambda_weight * len(orphans)
+        crossings = self.environment.count_crossings()
+
+        lambda_weight = 2.0  # orphan penalty
+        gamma_weight = 1.0  # crossing penalty
+
+        return -delta_distance - lambda_weight * len(orphans) - gamma_weight * crossings
 
     def try_recovery(self, truck: Truck) -> bool:
         if random.random() < config.RECOVERY_PROB:

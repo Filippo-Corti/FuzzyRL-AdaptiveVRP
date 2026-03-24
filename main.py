@@ -1,7 +1,7 @@
 import random
 
 import config
-from agent import CrispQLearningAgent
+from agent import CrispQLearningAgent, CrispQLambdaAgent
 from env import VRPEnvironment, Truck
 from heuristics.do_nothing import DoNothing
 from heuristics.insertion import NearestInsertion
@@ -32,7 +32,7 @@ env = VRPEnvironment(
 
 simulation = VRPSimulation(
     environment=env,
-    agent=CrispQLearningAgent(),
+    agent=CrispQLambdaAgent(),
     actions=[
         NearestInsertion(),
         CostliestRemoval(),

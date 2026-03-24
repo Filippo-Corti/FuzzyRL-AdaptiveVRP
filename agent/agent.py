@@ -41,3 +41,10 @@ class VRPAgent(ABC):
         Returns a snapshot of the agent's internal state for visualization purposes.
         """
         pass
+
+    @abstractmethod
+    def notify_of_disruption(self, disruption: bool):
+        """
+        Notifies the agent that a disruption has occurred, so it can update its internal state if needed.
+        """
+        pass

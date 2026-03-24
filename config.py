@@ -1,33 +1,22 @@
+# General Configurations for the VRP Simulation
 NUM_NODES = 32
 NUM_TRUCKS = 5
 TRUCK_CAPACITY = int((NUM_NODES + NUM_TRUCKS - 1) // NUM_TRUCKS * 1.25)
 
 # Disruptions
 DISRUPTION_PROB = 0.005
-RECOVERY_PROB = 0.1
+RECOVERY_PROB = 0.2
 
-
-LAMBDA_UNVISITED = 10.0
-MU_IMBALANCE = 3.0
-ALPHA = 0.1
-GAMMA = 0.9
-LAMBDA_TRACES = 0.8
-NUM_EPISODES = 500
-MAX_ROUNDS = 200
-
+# Eligibility Traces
+LAMBDA = 0.95
 
 # Epsilon-greedy Config:
 EPSILON_START = 0.95
 EPSILON_MIN = 0.05
-EPSILON_DECAY = 0.996
-LEARNING_RATE = 0.1
+EPSILON_DECAY = 0.9979  # hits floor around step 70k
+LEARNING_RATE = 0.05
 DISCOUNT_FACTOR = 0.95
-DECAY_EVERY = 100
-
-# Reward Weights Config (currently not in use):
-DISTANCE_WEIGHT = 1.0
-ORPHAN_WEIGHT = 1.0
-IMBALANCE_WEIGHT = 1.0
+DECAY_EVERY = 50
 
 # Visualization Config:
 WINDOW_W = 1920

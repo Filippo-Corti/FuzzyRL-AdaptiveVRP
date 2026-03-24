@@ -37,6 +37,23 @@ class VRPNode:
     def distance_to(self, other: "VRPNode") -> float:
         return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
 
+    @staticmethod
+    def segments_cross(a: "VRPNode", b: "VRPNode", c: "VRPNode", d: "VRPNode") -> bool:
+        """
+        Returns True if segment AB properly intersects segment CD.
+        Uses cross product sign method.
+        """
+
+        def cross(o, u, v):
+            return (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x)
+
+        d1 = cross(c, d, a)
+        d2 = cross(c, d, b)
+        d3 = cross(a, b, c)
+        d4 = cross(a, b, d)
+
+        return ((d1 > 0 > d2) or (d1 < 0 < d2)) and ((d3 > 0 > d4) or (d3 < 0 < d4))
+
 
 class VRPGraph:
     """

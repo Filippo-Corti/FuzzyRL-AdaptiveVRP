@@ -111,10 +111,21 @@ class MetricsPlotter:
         ax.set_title("Route distance (fully assigned only)")
         ax.set_xlabel("Step")
         ax.set_ylabel("Distance")
+
         valid_steps = [s for s, d in zip(self.steps, self.distances) if d > 0]
         valid_dists = [d for d in self.distances if d > 0]
+
         if valid_steps:
-            ax.scatter(valid_steps, valid_dists, s=4, alpha=0.3, color="mediumseagreen")
+            ax.scatter(valid_steps, valid_dists, s=4, alpha=0.6, color="mediumseagreen")
+            smoothed = _rolling_mean(valid_dists, WINDOW)
+            ax.plot(
+                valid_steps,
+                smoothed,
+                color="red",
+                linewidth=1.5,
+                label=f"MA-{WINDOW}",
+            )
+
         ax.plot(
             self.steps,
             self.best_distances,

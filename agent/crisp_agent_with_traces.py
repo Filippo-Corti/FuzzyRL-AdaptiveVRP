@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-
 import config
 import random
 from collections import defaultdict
@@ -24,25 +23,33 @@ BIN_DEFINITIONS: dict[str, list[float]] = {
 State = tuple[int, int, int, int, int, int]
 
 
-class CrispQLearningAgent(VRPAgent):
+class CrispQLambdaAgent(VRPAgent):
 
     def __init__(self):
         super().__init__()
         self.q_table: dict[tuple[State, HeuristicAction], float] = defaultdict(float)
+        self.traces: dict[tuple[State, HeuristicAction], float] = defaultdict(float)
+
         self.epsilon = config.EPSILON_START
         self.alpha = config.LEARNING_RATE
         self.gamma = config.DISCOUNT_FACTOR
+        self.lam = config.LAMBDA  # eligibility trace decay
         self.decay_frequency = config.DECAY_EVERY
+
         self.last_state: State | None = None
         self.last_action: HeuristicAction | None = None
         self.updates_since_decay = 0
+        self.disruption_flag = False
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def select_action(
         self, obs: EnvObservation, available_actions: list[HeuristicAction]
     ) -> HeuristicAction:
         state = self.observation_to_state(obs)
 
-        # Epsilon-greedy action selection
         if random.random() < self.epsilon:
             action = random.choice(available_actions)
         else:
@@ -62,17 +69,44 @@ class CrispQLearningAgent(VRPAgent):
 
         next_state = self.observation_to_state(next_obs)
         best_next_q = self.max_q(next_state, available_actions)
-        key = (self.last_state, self.last_action)
 
-        self.q_table[key] += self.alpha * (
-            reward + self.gamma * best_next_q - self.q_table[key]
+        # TD error — same as standard Q-learning
+        td_error = (
+            reward
+            + self.gamma * best_next_q
+            - self.q_table[(self.last_state, self.last_action)]
         )
 
+        # Accumulate trace for the current state-action pair
+        self.traces[(self.last_state, self.last_action)] += 1.0
+
+        # Update ALL entries in Q and traces proportionally to their trace value
+        for key in list(self.traces.keys()):
+            self.q_table[key] += self.alpha * td_error * self.traces[key]
+            self.traces[key] *= self.gamma * self.lam
+
+            # Prune negligible traces to keep memory bounded
+            if self.traces[key] < 1e-6:
+                del self.traces[key]
+
+        # Reset traces on disruption
+        if self.disruption_flag:
+            self.reset_traces()
+
+        # Epsilon decay
         if self.updates_since_decay >= self.decay_frequency:
             self.decay_epsilon()
             self.updates_since_decay = 0
         else:
             self.updates_since_decay += 1
+
+    def reset_traces(self):
+        """Call this when a disruption fires — past decisions are less relevant."""
+        self.traces.clear()
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
 
     def decay_epsilon(self):
         self.epsilon = max(config.EPSILON_MIN, self.epsilon * config.EPSILON_DECAY)
@@ -86,7 +120,7 @@ class CrispQLearningAgent(VRPAgent):
         return max(self.q_table[(state, a)] for a in available_actions)
 
     def notify_of_disruption(self, disruption: bool):
-        pass
+        self.disruption_flag = disruption
 
     @staticmethod
     def discretize(value: float, edges: list[float]) -> int:
@@ -98,23 +132,20 @@ class CrispQLearningAgent(VRPAgent):
     @staticmethod
     def observation_to_state(obs: EnvObservation) -> State:
         return (
-            CrispQLearningAgent.discretize(
-                obs.truck_load, BIN_DEFINITIONS["truck_load"]
-            ),
-            CrispQLearningAgent.discretize(
+            CrispQLambdaAgent.discretize(obs.truck_load, BIN_DEFINITIONS["truck_load"]),
+            CrispQLambdaAgent.discretize(
                 obs.fleet_availability, BIN_DEFINITIONS["fleet_availability"]
             ),
-            CrispQLearningAgent.discretize(
+            CrispQLambdaAgent.discretize(
                 obs.orphan_pressure, BIN_DEFINITIONS["orphan_pressure"]
             ),
-            CrispQLearningAgent.discretize(
+            CrispQLambdaAgent.discretize(
                 obs.nearest_orphan_dist, BIN_DEFINITIONS["nearest_orphan_dist"]
             ),
-            CrispQLearningAgent.discretize(
-                obs.nearest_orphan_rel_dist,
-                BIN_DEFINITIONS["nearest_orphan_rel_dist"],
+            CrispQLambdaAgent.discretize(
+                obs.nearest_orphan_rel_dist, BIN_DEFINITIONS["nearest_orphan_rel_dist"]
             ),
-            CrispQLearningAgent.discretize(
+            CrispQLambdaAgent.discretize(
                 obs.route_efficiency, BIN_DEFINITIONS["route_efficiency"]
             ),
         )
