@@ -10,12 +10,10 @@ if TYPE_CHECKING:
     from heuristics import HeuristicAction, Heuristic
 
 MAX_STEPS = 100
-LAMBDA_ORPHAN = 10.0
-GAMMA_CROSSINGS = 0.5
-TERMINAL_BONUS = 40.0
-TERMINAL_DISTANCE_PENALTY = 4.0
-TERMINAL_CROSSING_PENALTY = 1.0
-TIMEOUT_PENALTY = -20.0
+TERMINAL_BONUS = 0.0
+TERMINAL_DISTANCE_PENALTY = 1.0
+TERMINAL_CROSSING_PENALTY = 5.0
+TIMEOUT_PENALTY = -50.0
 
 
 @dataclass
@@ -31,7 +29,7 @@ class EpisodeResult:
     q_table_size: int
 
 
-class BreakdownTraining:
+class ImprovementTraining:
 
     def __init__(
         self,
@@ -58,35 +56,33 @@ class BreakdownTraining:
             available = self.available_actions(truck)
 
             action = self.agent.select_action(obs, available)
-            delta_distance = self.apply_action(action, truck)
-            reward = self.per_step_reward(delta_distance)
+            delta_distance, delta_crossings = self.apply_action(action, truck)
+            reward = self.per_step_reward(delta_distance, delta_crossings)
             total_reward += reward
 
-            done = self.environment.graph.is_fully_assigned
-            is_last_step = step == MAX_STEPS - 1
-
-            if done or is_last_step:
-                terminal = self.terminal_reward(success=done)
-                total_reward += terminal
-                next_obs = self.environment.get_observation(truck)
-                next_available = self.available_actions(truck)
-                self.agent.update(next_obs, reward + terminal, next_available)
-                return EpisodeResult(
-                    number=0,
-                    steps=step + 1,
-                    success=done,
-                    final_distance=self.environment.compute_total_distance(),
-                    final_crossings=self.environment.count_crossings(),
-                    final_orphans=len(list(self.environment.graph.unassigned_nodes())),
-                    total_reward=total_reward,
-                    epsilon=self.agent.epsilon,
-                    q_table_size=len(self.agent.q_table),
-                )
+            # Episode always runs full MAX_STEPS
+            done = step == MAX_STEPS - 1
 
             next_obs = self.environment.get_observation(truck)
             next_available = self.available_actions(truck)
             self.agent.update(next_obs, reward, next_available)
             self.advance_truck()
+
+            if done:
+                terminal = self.terminal_reward()
+                total_reward += terminal
+                self.agent.update(next_obs, terminal, next_available)
+                return EpisodeResult(
+                    number=0,
+                    steps=step + 1,
+                    success=True,  # always feasible
+                    final_distance=self.environment.compute_total_distance(),
+                    final_crossings=self.environment.count_crossings(),
+                    final_orphans=0,
+                    total_reward=total_reward,
+                    epsilon=self.agent.epsilon,
+                    q_table_size=len(self.agent.q_table),
+                )
 
         assert False  # Should never reach here
 
@@ -97,39 +93,44 @@ class BreakdownTraining:
             if self.on_episode_end:
                 self.on_episode_end(result)
             if (episode + 1) % 10 == 0:
-                status = "SUCCESS" if result.success else "TIMEOUT"
                 print(
-                    f"[{status}] Episode {episode + 1}/{n_episodes} | "
+                    f"Episode {episode + 1}/{n_episodes} | "
                     f"steps={result.steps:3d} | "
-                    f"orphans={result.final_orphans} | "
                     f"dist={result.final_distance:.2f} | "
+                    f"crossings={result.final_crossings} | "
                     f"reward={result.total_reward:.1f} | "
                     f"eps={result.epsilon:.4f} | "
                     f"Q={result.q_table_size}"
                 )
 
     def reset_episode(self):
-        # Clear all routes and unassign all nodes
+        # Reset truck routes and assignments to a feasible solution
         for truck in self.environment.trucks.values():
             truck.route.clear()
             truck.recover()
         for node in self.environment.graph:
             node.assignment = None
 
-        # Insert in random truck order to diversify starting states
-        truck_list = list(self.environment.trucks.values())
-        random.shuffle(truck_list)
-        for truck in truck_list:
-            while self.insert_heuristic.is_applicable(self.environment, truck):
+        # Generate initial feasible solution with insert heuristic
+        unfilled_trucks = [t for t in self.environment.trucks.values() if not t.is_full]
+        while not self.environment.graph.is_fully_assigned:
+            # Pick a random truck that still has capacity
+            truck = random.choice(unfilled_trucks)
+
+            if self.insert_heuristic.is_applicable(self.environment, truck):
                 self.insert_heuristic.apply(self.environment, truck)
+            else:
+                print(
+                    f"Nopers for some reason ({self.environment.graph.orphans_count})"
+                )
 
-        # Break down a random truck
-        truck = random.choice(list(self.environment.trucks.values()))
-        self.environment.breakdown(truck.id)
+            # Update the list of trucks with remaining capacity
+            unfilled_trucks = [
+                t for t in self.environment.trucks.values() if not t.is_full
+            ]
 
-        # Reset episode counters
         self.current_truck_idx = 0
-        self.agent.notify_of_disruption()
+        self.agent.notify_of_disruption()  # can use to reset internal state
 
     def current_active_truck(self):
         active = [t for t in self.environment.trucks.values() if t.is_active()]
@@ -146,20 +147,20 @@ class BreakdownTraining:
             if v.is_applicable(self.environment, truck)
         ]
 
-    def apply_action(self, action: HeuristicAction, truck) -> float:
-        before = self.environment.compute_truck_distance(truck.id)
+    def apply_action(self, action: HeuristicAction, truck) -> tuple[float, int]:
+        before_distance = self.environment.compute_truck_distance(truck.id)
+        before_crossings = self.environment.count_crossings()
         self.actions[action].apply(self.environment, truck)
-        after = self.environment.compute_truck_distance(truck.id)
-        return after - before
+        after_distance = self.environment.compute_truck_distance(truck.id)
+        after_crossings = self.environment.count_crossings()
+        return after_distance - before_distance, after_crossings - before_crossings
 
-    def per_step_reward(self, delta_distance: float) -> float:
-        orphans = len(list(self.environment.graph.unassigned_nodes()))
-        crossings = self.environment.count_crossings()
-        return -delta_distance - LAMBDA_ORPHAN * orphans * -GAMMA_CROSSINGS * crossings
+    def per_step_reward(self, delta_distance: float, delta_crossings: float) -> float:
+        return -delta_distance - 5.0 * (
+            delta_crossings**2
+        )  # stepwise improvement reward
 
-    def terminal_reward(self, success: bool) -> float:
-        if not success:
-            return TIMEOUT_PENALTY
+    def terminal_reward(self) -> float:
         distance = self.environment.compute_total_distance()
         crossings = self.environment.count_crossings()
         return (

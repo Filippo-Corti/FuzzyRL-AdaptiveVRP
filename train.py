@@ -1,8 +1,10 @@
+from agent import RebalancingAgent
 from env import VRPEnvironment, Truck
 from agent.breakdown_agent import BreakdownAgent
-from heuristics import NearestInsertion, CostliestRemoval, TwoOpt
+from heuristics import NearestInsertion, CostliestRemoval, TwoOpt, DoNothing
 from simulation import BreakdownTraining
 from simulation.breakdown_training import EpisodeResult
+from simulation.improvement_training import ImprovementTraining
 from utils import parse_vrp_instance
 
 import config
@@ -28,7 +30,8 @@ env = VRPEnvironment(
     graph=graph,
     trucks=trucks,
 )
-agent = BreakdownAgent()
+# agent = BreakdownAgent()
+agent = RebalancingAgent()
 
 plotter = BreakdownTrainingPlotter()
 
@@ -39,10 +42,11 @@ def on_episode_end(result: EpisodeResult):
         plotter.draw()
 
 
-training = BreakdownTraining(
+training = ImprovementTraining(
     environment=env,
     agent=agent,
-    actions=[NearestInsertion(), CostliestRemoval(), TwoOpt()],
+    # actions=[NearestInsertion(), CostliestRemoval(), TwoOpt()],
+    actions=[TwoOpt(), DoNothing()],
     insert_heuristic=NearestInsertion(),
     on_episode_end=on_episode_end,
 )
