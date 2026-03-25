@@ -43,6 +43,7 @@ class DepotSnapshot:
 @dataclass
 class SimulationStats:
     round: int
+    status: str
     orphans: int
     total_nodes: int
     total_trucks: int

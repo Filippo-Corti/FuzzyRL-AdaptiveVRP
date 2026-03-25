@@ -41,3 +41,4 @@ class HeuristicAction(StrEnum):
     NEAREST_INSERTION = "Nearest Insertion"
     COSTLIEST_REMOVAL = "Costliest Removal"
     TWO_OPT = "2-opt"
+    CROSS_INSERT = "Cross Insert"

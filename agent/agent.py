@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 class VRPAgent(ABC):
 
     def __init__(self):
+        self.epsilon = 0.0
+        self.q_table = None
         pass
 
     @abstractmethod
@@ -43,7 +45,7 @@ class VRPAgent(ABC):
         pass
 
     @abstractmethod
-    def notify_of_disruption(self, disruption: bool):
+    def notify_of_disruption(self):
         """
         Notifies the agent that a disruption has occurred, so it can update its internal state if needed.
         """

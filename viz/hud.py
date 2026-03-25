@@ -69,6 +69,7 @@ class HUD:
     def _draw_stats(self, stats: snapshot.SimulationStats, y: float):
         lines = [
             ("Round", str(stats.round)),
+            ("Status", stats.status),
             ("Orphans", f"{stats.orphans} / {stats.total_nodes}"),
             (
                 "Active trucks",

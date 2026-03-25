@@ -65,6 +65,9 @@ class Truck:
     def recover(self):
         self.status = TruckStatus.ACTIVE
 
+    def is_active(self) -> bool:
+        return self.status == TruckStatus.ACTIVE
+
     @property
     def route_size(self) -> int:
         return len(self.route)

@@ -85,7 +85,7 @@ class CrispQLearningAgent(VRPAgent):
     def max_q(self, state: State, available_actions: list[HeuristicAction]) -> float:
         return max(self.q_table[(state, a)] for a in available_actions)
 
-    def notify_of_disruption(self, disruption: bool):
+    def notify_of_disruption(self):
         pass
 
     @staticmethod

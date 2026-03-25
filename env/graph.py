@@ -81,6 +81,10 @@ class VRPGraph:
     def is_fully_assigned(self) -> bool:
         return all(node.is_assigned for node in self.nodes.values())
 
+    @property
+    def orphans_count(self) -> int:
+        return sum(1 for node in self.nodes.values() if not node.is_assigned)
+
     def unassigned_nodes(self) -> Iterator[VRPNode]:
         """
         Iterates over the unassigned nodes

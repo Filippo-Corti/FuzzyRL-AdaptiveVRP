@@ -62,8 +62,8 @@ The simulation operates in three distinct modes that gate which agent is active 
   rebalancing agent runs, redistributing load toward the recovered truck and improving route geometry. This mode ends
   when load imbalance falls below a threshold and the solution stabilises.
 
-- In the ambiguous case where both orphans exist and a truck has just recovered, breakdown recovery takes priority since
-  coverage is the harder constraint.
+In the ambiguous case where both orphans exist and a truck has just recovered, breakdown recovery takes priority since
+coverage is the harder constraint.
 
 ## Dual-Agent Architecture
 

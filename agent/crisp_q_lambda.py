@@ -92,6 +92,7 @@ class CrispQLambdaAgent(VRPAgent):
         # Reset traces on disruption
         if self.disruption_flag:
             self.reset_traces()
+            self.disruption_flag = False
 
         # Epsilon decay
         if self.updates_since_decay >= self.decay_frequency:
@@ -119,8 +120,8 @@ class CrispQLambdaAgent(VRPAgent):
     def max_q(self, state: State, available_actions: list[HeuristicAction]) -> float:
         return max(self.q_table[(state, a)] for a in available_actions)
 
-    def notify_of_disruption(self, disruption: bool):
-        self.disruption_flag = disruption
+    def notify_of_disruption(self):
+        self.disruption_flag = True
 
     @staticmethod
     def discretize(value: float, edges: list[float]) -> int:

@@ -58,6 +58,20 @@ class VRPEnvironment:
                     crossings += 1
         return crossings
 
+    def compute_imbalance(self) -> float:
+        """
+        Computes the imbalance of the current load distribution across active trucks, measured as the standard deviation of the loads.
+        """
+        active_trucks = [
+            t for t in self.trucks.values() if t.status == TruckStatus.ACTIVE
+        ]
+        if len(active_trucks) < 2:
+            return 0.0
+        loads = [t.load for t in active_trucks]
+        mean = sum(loads) / len(loads)
+        variance = sum((l - mean) ** 2 for l in loads) / len(loads)
+        return variance**0.5  # standard deviation
+
     def breakdown(self, truck_id: int):
         """
         Breaks down the truck with the given id, making it unavailable for a certain number of steps and unassigning its nodes
@@ -86,7 +100,8 @@ class VRPEnvironment:
         orphans = list(self.graph.unassigned_nodes())
         route = self.get_truck_route(truck.id)
 
-        # Nearest orphan distance
+        # --- existing fields (unchanged) ---
+
         if orphans and len(route) > 0:
             nearest_orphan = min(
                 orphans,
@@ -99,9 +114,6 @@ class VRPEnvironment:
             nearest_orphan = None
             nearest_orphan_dist = 0.0
 
-        # Nearest orphan relative distance
-        # How does this truck compare to other trucks in terms of proximity to the nearest orphan?
-        # < 1.0 means this truck is closer than average, > 1.0 means it is further
         if nearest_orphan is not None:
             other_trucks = [
                 t
@@ -119,22 +131,60 @@ class VRPEnvironment:
                 fleet_avg = sum(other_distances) / len(other_distances)
                 nearest_orphan_rel_dist = nearest_orphan_dist / (fleet_avg + 1e-9)
             else:
-                nearest_orphan_rel_dist = 1.0  # only truck, no comparison possible
+                nearest_orphan_rel_dist = 1.0
         else:
             nearest_orphan_rel_dist = 1.0
 
-        # Route efficiency
-        # Ratio of actual route distance to number of nodes in the route
-        # Lower means more efficient (shorter distance per node)
-        # Normalised by the average edge distance in the unit square (~0.52)
         if truck.route_size > 0:
             route_distance = sum(
                 route[i].distance_to(route[i + 1]) for i in range(len(route) - 1)
             )
             avg_distance_per_node = route_distance / truck.route_size
-            route_efficiency = avg_distance_per_node / 0.52  # normalise by expected avg
+            route_efficiency = avg_distance_per_node / 0.52
         else:
             route_efficiency = 0.0
+
+        # --- new: removal gain ---
+        # Best distance saved by removing one node from this truck's route
+        # Normalised by average edge distance in unit square
+        removal_gain = 0.0
+        if len(truck.route) >= 1:
+            best_gain = 0.0
+            for i, node_id in enumerate(truck.route):
+                node = self.graph.get_node(node_id)
+                prev_node = route[i]  # route includes depot at index 0
+                next_node = route[i + 2]  # route includes depot, so offset by 1
+                cost_without = prev_node.distance_to(next_node)
+                cost_with = prev_node.distance_to(node) + node.distance_to(next_node)
+                gain = cost_with - cost_without
+                if gain > best_gain:
+                    best_gain = gain
+            removal_gain = (
+                min(best_gain / 0.52, 2.0) / 2.0
+            )  # normalise same as efficiency
+
+        # --- new: route imbalance (fleet-level, same value for all trucks) ---
+        route_imbalance = self.compute_imbalance()
+        # Normalise: imbalance is std dev of load fractions, max plausible ~0.5
+        route_imbalance = min(route_imbalance / 0.5, 1.0)
+
+        # Cheapest insertion cost for the nearest orphan into this truck's route
+        insertion_cost = 0.0
+        if orphans and len(route) >= 2:
+            nearest = min(
+                orphans,
+                key=lambda o: min(node.distance_to(o) for node in route),
+            )
+            best_cost = math.inf
+            for i in range(len(route) - 1):
+                cost = (
+                    route[i].distance_to(nearest)
+                    + nearest.distance_to(route[i + 1])
+                    - route[i].distance_to(route[i + 1])
+                )
+                if cost < best_cost:
+                    best_cost = cost
+            insertion_cost = min(best_cost / 0.52, 2.0) / 2.0
 
         return EnvObservation(
             truck_load=truck.load,
@@ -147,6 +197,9 @@ class VRPEnvironment:
             nearest_orphan_dist=min(nearest_orphan_dist / math.sqrt(2), 1.0),
             nearest_orphan_rel_dist=min(nearest_orphan_rel_dist, 2.0) / 2.0,
             route_efficiency=min(route_efficiency, 2.0) / 2.0,
+            removal_gain=removal_gain,
+            route_imbalance=route_imbalance,
+            insertion_cost=insertion_cost,
         )
 
     def get_snapshot(self) -> EnvironmentSnapshot:
