@@ -14,10 +14,17 @@ class VRPAgent(ABC):
         pass
 
     @abstractmethod
-    def select_node(self, obs: EnvObservation) -> int:
+    def select_node(self, obs: EnvObservation, greedy: bool = False) -> int:
         """
         Selects the id of the next node to visit based on the current observation of the environment.
         If -1, the agent chooses to return to the depot.
+        """
+        pass
+
+    @abstractmethod
+    def record(self, obs: EnvObservation):
+        """
+        Explicitly record log prob of the last action taken. Call during training only.
         """
         pass
 
@@ -29,7 +36,7 @@ class VRPAgent(ABC):
         pass
 
     @abstractmethod
-    def finish_episode(self):
+    def finish_episode(self, baseline: float | None = None):
         """
         Called at the end of an episode, can be used for cleanup or learning updates.
         """

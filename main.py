@@ -3,14 +3,14 @@ import matplotlib
 matplotlib.use("tkagg")
 
 import config
-from agent import GreedyAgent
+from agent import VRPAgent, greedy, transformer
 from env import VRPEnvironment, Truck
 from simulation import VRPSimulation
 from utils import generate_vrp_instance
 from viz import run
 
 
-def create_simulation():
+def create_simulation(agent: VRPAgent | None = None) -> VRPSimulation:
     # Generate new instance
     graph, vehicle_capacity = generate_vrp_instance(num_nodes=config.NUM_NODES)
 
@@ -27,11 +27,15 @@ def create_simulation():
         truck=truck,
     )
 
-    agent = GreedyAgent()
+    if not agent:
+        agent = greedy.GreedyAgent()
 
     return VRPSimulation(environment=env, agent=agent)
 
 
 if __name__ == "__main__":
-    simulation = create_simulation()
-    run(simulation, create_simulation)
+    agent = transformer.TransformerAgent(
+        nodes_features=4, state_features=3, d_model=128
+    )
+    simulation = create_simulation(agent)
+    run(simulation, lambda: create_simulation(agent))

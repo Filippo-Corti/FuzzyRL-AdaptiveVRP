@@ -79,13 +79,17 @@ def run(simulation: VRPSimulation, simulation_factory):
             ms_since_tick += dt
 
             if done:
+                baseline = simulation.compute_baseline()
+                simulation.agent.finish_episode(baseline=baseline)
                 simulation = simulation_factory()
                 done = False
             elif ms_since_tick >= sim_step_ms or step_once:
                 ms_since_tick = 0
                 step_once = False
 
-                done, _ = simulation.step()
+                reward = simulation.execute_step(record=True)
+                simulation.next_step()
+                done = simulation.environment.graph.orphans_count == 0
 
         # --- RENDER ---
         screen.fill((0, 0, 0))

@@ -19,7 +19,7 @@ class GreedyAgent(VRPAgent):
         super().__init__()
         self.last_choice: NodeObservation | None = None
 
-    def select_node(self, obs: EnvObservation) -> int:
+    def select_node(self, obs: EnvObservation, greedy: bool = True) -> int:
         """
         Selects the id of the closest unvisited node with demand.
         """
@@ -52,10 +52,13 @@ class GreedyAgent(VRPAgent):
             return best_node.id
         assert False
 
+    def record(self, obs: EnvObservation):
+        pass
+
     def update(self, reward: float, obs: EnvObservation):
         pass
 
-    def finish_episode(self):
+    def finish_episode(self, baseline: float | None = None):
         self.last_choice = None
 
     def snapshot(self) -> AgentSnapshot:

@@ -23,7 +23,9 @@ class Decoder(nn.Module):
     ) -> torch.Tensor:
         # 1) Build attention scores, using node_embeddings and the query
         query = self.query_proj(query_state)  # (batch, d_model)
-        query_expanded = query.unsqueeze(1)  # (batch, 1, d_model) <- Requiredfor
+        query_expanded = query.unsqueeze(
+            1
+        )  # (batch, 1, d_model) <- Required for batch matrix multiplication
 
         attn_scores = (query_expanded @ node_embeddings.transpose(1, 2)) / math.sqrt(
             self.d_model
@@ -36,3 +38,13 @@ class Decoder(nn.Module):
         attn_weights = torch.softmax(attn_scores, dim=-1)  # (batch, 1, N)
         context = attn_weights @ node_embeddings  # (batch, 1, d_model)
         context = context.squeeze(1)  # (batch, d_model)
+
+        scores = self.scores_proj(context)
+
+        # 2) Build a distribution over the next node to visit, using the attention scores
+        logits = (node_embeddings @ scores.unsqueeze(-1)).squeeze(-1) / math.sqrt(
+            self.d_model
+        )  # (batch, N, 1)
+
+        logits = logits.masked_fill(mask, float("-inf"))
+        return torch.log_softmax(logits, dim=-1)
