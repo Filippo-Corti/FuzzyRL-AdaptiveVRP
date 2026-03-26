@@ -1,7 +1,9 @@
-from env import VRPGraph, VRPNode
+import random
+
+from env import VRPGraph, VRPNode, Truck
 
 
-def parse_vrp_instance(path: str) -> VRPGraph:
+def parse_vrp_instance(path: str) -> tuple[VRPGraph, int]:
     with open(path) as f:
         lines = f.readlines()
 
@@ -18,7 +20,6 @@ def parse_vrp_instance(path: str) -> VRPGraph:
 
         if line.startswith("CAPACITY"):
             capacity = int(line.split(":")[1].strip())
-            continue
 
         if line in ("NODE_COORD_SECTION", "DEMAND_SECTION", "DEPOT_SECTION"):
             section = line
@@ -50,12 +51,31 @@ def parse_vrp_instance(path: str) -> VRPGraph:
         )
 
     depot_coord = coords[depot_id]
-    depot = VRPNode(id=depot_id, pos=normalise(*depot_coord))
+    depot = VRPNode(id=depot_id, pos=normalise(*depot_coord), demand=0, depot=True)
     graph = VRPGraph(depot=depot)
 
     for node_id, (x, y) in coords.items():
         if node_id == depot_id:
             continue
-        graph.add(VRPNode(id=node_id, pos=normalise(x, y)))
+        graph.add(VRPNode(id=node_id, pos=normalise(x, y), demand=demands[node_id]))
 
-    return graph
+    return graph, capacity
+
+
+def generate_vrp_instance(num_nodes: int) -> tuple[VRPGraph, int]:
+    depot = VRPNode(id=1, pos=generate_xy(), demand=0, depot=True)
+    graph = VRPGraph(depot=depot)
+
+    for node_id in range(2, num_nodes + 2):
+        pos = generate_xy()
+        demand = random.randint(1, 10)
+        graph.add(VRPNode(id=node_id, pos=pos, demand=demand))
+
+    capacity = random.randint(
+        int(5.5 * 4), int(5.5 * 10)
+    )  # On average, demand per node is 5.5. We want the capacity to be enough to serve 4-10 nodes on average.
+    return graph, capacity
+
+
+def generate_xy() -> tuple[float, float]:
+    return round(random.uniform(0, 1), 2), round(random.uniform(0, 1), 2)

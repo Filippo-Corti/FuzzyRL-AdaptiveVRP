@@ -1,10 +1,30 @@
 from enum import Enum
 from typing import Iterable
 
+from .graph import VRPNode
+
 
 class TruckStatus(Enum):
     ACTIVE = 0
     BROKEN = 1
+
+
+class TruckRoute:
+
+    def __init__(self):
+        self.route: list[VRPNode] = list()
+        self.load: int = 0
+        self.is_closed: bool = False
+
+    def add(self, node: VRPNode):
+        self.route.append(node)
+        self.load += node.demand
+
+    def close(self):
+        self.is_closed = True
+
+    def __iter__(self) -> Iterable[VRPNode]:
+        return iter(self.route)
 
 
 class Truck:
@@ -19,48 +39,22 @@ class Truck:
         self.id = id
         self.pos = pos
         self.status = TruckStatus.ACTIVE
-        self.route: list[int] = list()
+        self.routes: list[TruckRoute] = list()  # list of (route, load) pairs
         self.capacity = capacity
 
-    def add_by_index(self, node_id: int, idx: int | None = None):
-        """
-        Adds node_id in position idx to the truck route.
-        If idx is None, it appends at the end
-        """
-        assert node_id not in self.route
-        assert not self.is_full
-        if idx is None:
-            self.route.append(node_id)
-        else:
-            self.route.insert(idx, node_id)
+    def add(self, node: VRPNode):
+        route = self.current_route
+        if route.load + node.demand > self.capacity:
+            raise RuntimeError("Truck capacity exceeds capacity")
+        route.add(node)
 
-    def remove_by_index(self, idx: int):
-        """
-        Removes node in position idx from the truck route
-        """
-        self.route.pop(idx)
-
-    def remove_by_id(self, node_id: int):
-        """
-        Removes node_id from the truck route
-        """
-        assert node_id in self.route
-        self.route.remove(node_id)
-
-    def add_after(self, node_id: int, prev_id: int):
-        """
-        Adds node_id after prev_id in the truck route
-        """
-        assert (
-            node_id not in self.route
-        ), f"Cannot add {node_id} to {self.route} because it's already there"
-        assert prev_id in self.route
-        assert not self.is_full
-        self.route.insert(self.route.index(prev_id) + 1, node_id)
+    def back_to_depot(self):
+        if self.routes:
+            self.routes[-1].close()
+        self.routes.append(TruckRoute())
 
     def breakdown(self):
         self.status = TruckStatus.BROKEN
-        self.route = list()
 
     def recover(self):
         self.status = TruckStatus.ACTIVE
@@ -69,16 +63,23 @@ class Truck:
         return self.status == TruckStatus.ACTIVE
 
     @property
-    def route_size(self) -> int:
-        return len(self.route)
+    def current_load(self) -> int:
+        return self.routes[-1].load if self.routes else 0
 
     @property
-    def load(self) -> float:
-        return self.route_size / self.capacity
+    def current_route(self) -> TruckRoute:
+        if not self.routes:
+            self.routes.append(TruckRoute())
+        return self.routes[-1]
 
     @property
     def is_full(self) -> bool:
-        return self.route_size >= self.capacity
+        return self.current_load >= self.capacity
 
-    def __iter__(self) -> Iterable[int]:
-        return iter(self.route)
+    def __iter__(self) -> Iterable[TruckRoute]:
+        return iter(self.routes)
+
+    def reset(self):
+        self.pos = (0.0, 0.0)
+        self.status = TruckStatus.ACTIVE
+        self.routes.clear()

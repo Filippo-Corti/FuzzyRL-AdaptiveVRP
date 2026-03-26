@@ -10,17 +10,19 @@ class VRPNode:
         self,
         id: int,
         pos: tuple[float, float],
-        assignment: int | None = None,
+        demand: int,
+        depot: bool = False,
     ):
         """
         :param id: the id of the node
         :param pos: the position of the node, in [0,1]^2
-        :param assignment: the truck id to which the node is assigned, or None
         """
         assert 0 <= pos[0] <= 1 and 0 <= pos[1] <= 1
         self.id = id
         self.pos = pos
-        self.assignment = assignment
+        self.demand = demand
+        self.visited = False
+        self.depot = depot
 
     @property
     def x(self) -> float:
@@ -30,29 +32,12 @@ class VRPNode:
     def y(self) -> float:
         return self.pos[1]
 
-    @property
-    def is_assigned(self) -> bool:
-        return self.assignment is not None
-
     def distance_to(self, other: "VRPNode") -> float:
         return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
 
     @staticmethod
-    def segments_cross(a: "VRPNode", b: "VRPNode", c: "VRPNode", d: "VRPNode") -> bool:
-        """
-        Returns True if segment AB properly intersects segment CD.
-        Uses cross product sign method.
-        """
-
-        def cross(o, u, v):
-            return (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x)
-
-        d1 = cross(c, d, a)
-        d2 = cross(c, d, b)
-        d3 = cross(a, b, c)
-        d4 = cross(a, b, d)
-
-        return ((d1 > 0 > d2) or (d1 < 0 < d2)) and ((d3 > 0 > d4) or (d3 < 0 < d4))
+    def distance(pos1: tuple[float, float], pos2: tuple[float, float]) -> float:
+        return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
 
 
 class VRPGraph:
@@ -66,6 +51,7 @@ class VRPGraph:
         """
         self.nodes: dict[int, VRPNode] = {}
         self.depot = depot
+        assert self.depot.depot
 
     def add(self, node: VRPNode):
         assert node.id not in self.nodes and node.id != self.depot.id
@@ -78,30 +64,22 @@ class VRPGraph:
         return iter(self.nodes.values())
 
     @property
-    def is_fully_assigned(self) -> bool:
-        return all(node.is_assigned for node in self.nodes.values())
+    def is_fully_visited(self) -> bool:
+        return all(node.visited for node in self.nodes.values())
 
     @property
     def orphans_count(self) -> int:
-        return sum(1 for node in self.nodes.values() if not node.is_assigned)
+        return sum(1 for node in self.nodes.values() if not node.visited)
 
-    def unassigned_nodes(self) -> Iterator[VRPNode]:
+    def unvisited_nodes(self) -> Iterator[VRPNode]:
         """
-        Iterates over the unassigned nodes
-        :return: the unassigned nodes
+        Iterates over the unvisited nodes
+        :return: the unvisited nodes
         """
         for _, node in self.nodes.items():
-            if not node.is_assigned:
+            if not node.visited:
                 yield node
 
-    def assigned_nodes(self, truck_id: int | None = None) -> Iterator[VRPNode]:
-        """
-        Iterates over the nodes assigned to a truck, or to all trucks if truck_id is None
-        :param truck_id: the id of the truck
-        :return: the nodes assigned to that truck
-        """
-        for _, node in self.nodes.items():
-            if (truck_id is not None and node.assignment == truck_id) or (
-                truck_id is None and node.assignment is not None
-            ):
-                yield node
+    def reset(self):
+        for node in self.nodes.values():
+            node.visited = False

@@ -5,48 +5,39 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from env import EnvObservation
-    from heuristics import HeuristicAction
     from simulation.snapshot import AgentSnapshot
 
 
 class VRPAgent(ABC):
 
     def __init__(self):
-        self.epsilon = 0.0
-        self.q_table = None
         pass
 
     @abstractmethod
-    def select_action(
-        self, observation: EnvObservation, available_actions: list[HeuristicAction]
-    ) -> HeuristicAction:
+    def select_node(self, obs: EnvObservation) -> int:
         """
-        Selects an action for the given truck based on the current state of the environment and the available actions.
-        """
-        pass
-
-    @abstractmethod
-    def update(
-        self,
-        obs: EnvObservation,
-        reward: float,
-        available_actions: list[HeuristicAction],
-    ):
-        """
-        Call this after the environment has transitioned as a result of the last select_action call.
+        Selects the id of the next node to visit based on the current observation of the environment.
+        If -1, the agent chooses to return to the depot.
         """
         pass
 
     @abstractmethod
-    def get_snapshot(self) -> AgentSnapshot:
+    def update(self, reward: float, obs: EnvObservation):
+        """
+        Receive reward based on the action taken
+        """
+        pass
+
+    @abstractmethod
+    def finish_episode(self):
+        """
+        Called at the end of an episode, can be used for cleanup or learning updates.
+        """
+        pass
+
+    @abstractmethod
+    def snapshot(self) -> AgentSnapshot:
         """
         Returns a snapshot of the agent's internal state for visualization purposes.
-        """
-        pass
-
-    @abstractmethod
-    def notify_of_disruption(self):
-        """
-        Notifies the agent that a disruption has occurred, so it can update its internal state if needed.
         """
         pass

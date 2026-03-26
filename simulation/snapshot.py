@@ -8,31 +8,21 @@ from enum import Enum
 PositionSnapshot = tuple[float, float]
 
 
-class NodeStatusSnapshot(Enum):
-    UNVISITED = 0
-    ASSIGNED = 1
-    VISITED = 2
-
-
-class TruckStatusSnapshot(Enum):
-    ACTIVE = 0
-    BROKEN = 1
-    RECOVERING = 2
-
-
 @dataclass
 class NodeSnapshot:
     id: int
     pos: PositionSnapshot
-    status: NodeStatusSnapshot
+    demand: int
+    visited: bool
 
 
 @dataclass
 class TruckSnapshot:
     id: int
     pos: PositionSnapshot
-    status: TruckStatusSnapshot
-    rel_load: float
+    load: int
+    capacity: int
+    routes: list[list[PositionSnapshot]]
 
 
 @dataclass
@@ -43,34 +33,22 @@ class DepotSnapshot:
 @dataclass
 class SimulationStats:
     round: int
-    status: str
     orphans: int
     total_nodes: int
-    total_trucks: int
-    active_trucks: int
     total_distance: float
-    episode_reward: float
-    truck_turn: int
-    last_action: str
-    best_solution_distance: float
-    last_distance: float
 
 
 @dataclass
 class AgentSnapshot:
-    memberships: dict[str, dict[str, float]]
-    q_values: dict[str, float]
-    chosen_action: str
-    q_table_size: int
-    epsilon: float
+    last_choice: PositionSnapshot
+    epsilon: float | None
 
 
 @dataclass
 class EnvironmentSnapshot:
     graph: list[NodeSnapshot]
-    trucks: list[TruckSnapshot]
+    truck: TruckSnapshot
     depot: DepotSnapshot
-    routes: list[list[PositionSnapshot]]
 
 
 @dataclass

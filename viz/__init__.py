@@ -1,3 +1,3 @@
-from .loop import run
+from .viz import run
 
 __all__ = ["run"]
