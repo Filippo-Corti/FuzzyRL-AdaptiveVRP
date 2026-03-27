@@ -67,6 +67,7 @@ class VRPEnvironment:
             truck_pos=self.truck.pos,
             truck_load=self.truck.current_load,
             truck_capacity=self.truck.capacity,
+            truck_at_depot=self.truck.at_depot
         )
 
     def snapshot(self) -> EnvironmentSnapshot:
@@ -106,4 +107,5 @@ class VRPEnvironment:
         """
         self.truck.reset()
         self.truck.pos = self.graph.depot.pos
+        self.truck.at_depot = True
         self.graph.reset()

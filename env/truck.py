@@ -29,7 +29,7 @@ class TruckRoute:
 
 class Truck:
 
-    def __init__(self, id: int, pos: tuple[float, float], capacity: int):
+    def __init__(self, id: int, pos: tuple[float, float], capacity: int, at_depot: bool=True):
         """
         :param id: the id of the truck
         :param pos: the position of the truck, in [0,1]^2
@@ -41,17 +41,20 @@ class Truck:
         self.status = TruckStatus.ACTIVE
         self.routes: list[TruckRoute] = list()  # list of (route, load) pairs
         self.capacity = capacity
+        self.at_depot = at_depot
 
     def add(self, node: VRPNode):
         route = self.current_route
         if route.load + node.demand > self.capacity:
             raise RuntimeError("Truck capacity exceeds capacity")
         route.add(node)
+        self.at_depot = False
 
     def back_to_depot(self):
         if self.routes:
             self.routes[-1].close()
         self.routes.append(TruckRoute())
+        self.at_depot = True
 
     def breakdown(self):
         self.status = TruckStatus.BROKEN
@@ -83,3 +86,4 @@ class Truck:
         self.pos = (0.0, 0.0)
         self.status = TruckStatus.ACTIVE
         self.routes.clear()
+        self.at_depot = False

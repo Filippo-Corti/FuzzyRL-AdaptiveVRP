@@ -28,11 +28,9 @@ class VRPSimulation:
         returning the total reward accumulated by the agent.
         """
         total_reward = 0.0
-        done = False
-        while not done:
+        while not self.is_complete():
             reward = self.execute_step(record=True)
             self.next_step()
-            done = self.environment.graph.orphans_count == 0
             total_reward += reward
 
         baseline = self.compute_baseline() if with_baseline else None
@@ -48,8 +46,7 @@ class VRPSimulation:
         if self.environment.graph.orphans_count != 0:
             reward = self.execute_step()
         self.next_step()
-        done = self.environment.graph.orphans_count == 0
-        return done, reward
+        return self.is_complete(), reward
 
     def execute_step(self, record: bool = False) -> float:
         s = self.environment.get_observation()
@@ -95,8 +92,7 @@ class VRPSimulation:
         total_reward = 0.0
 
         with torch.no_grad():
-            done = False
-            while not done:
+            while not self.is_complete():
                 s = self.environment.get_observation()
                 node_id = self.agent.select_node(s, greedy=True)
 
@@ -109,7 +105,6 @@ class VRPSimulation:
 
                 s_prime = self.environment.get_observation()
                 total_reward += self.compute_reward(s, s_prime)
-                done = self.environment.graph.orphans_count == 0
 
         self.environment.reset()
         return total_reward
@@ -120,3 +115,6 @@ class VRPSimulation:
         """
         self.step_count = 0
         self.environment.reset()
+
+    def is_complete(self):
+        return self.environment.graph.is_fully_visited and self.environment.truck.at_depot

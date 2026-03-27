@@ -61,8 +61,10 @@ def parse_vrp_instance(path: str) -> tuple[VRPGraph, int]:
 
     return graph, capacity
 
-
+saved = None
 def generate_vrp_instance(num_nodes: int) -> tuple[VRPGraph, int]:
+    if saved:
+        return saved
     depot = VRPNode(id=1, pos=generate_xy(), demand=0, depot=True)
     graph = VRPGraph(depot=depot)
 
@@ -72,10 +74,11 @@ def generate_vrp_instance(num_nodes: int) -> tuple[VRPGraph, int]:
         graph.add(VRPNode(id=node_id, pos=pos, demand=demand))
 
     capacity = random.randint(
-        int(5.5 * 4), int(5.5 * 10)
+        int(5.5 * 5), int(5.5 * 6)
     )  # On average, demand per node is 5.5. We want the capacity to be enough to serve 4-10 nodes on average.
     return graph, capacity
 
-
 def generate_xy() -> tuple[float, float]:
     return round(random.uniform(0, 1), 2), round(random.uniform(0, 1), 2)
+
+saved = generate_vrp_instance(12)

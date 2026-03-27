@@ -1,6 +1,6 @@
 # General Configurations for the VRP Simulation
-NUM_NODES = 32
-NUM_TRUCKS = 5
+NUM_NODES = 12
+NUM_TRUCKS = 5 # Ignore this for now
 TRUCK_CAPACITY = int((NUM_NODES + NUM_TRUCKS - 1) // NUM_TRUCKS * 1.25)
 
 # Disruptions
@@ -26,7 +26,7 @@ WINDOW_H = 1080
 GRAPH_W = 1360
 HUD_W = WINDOW_W - GRAPH_W
 FPS_CAP = 1000
-SIM_STEP_MS = 250
+SIM_STEP_MS = 0
 FONT_SIZE = 25
 FONT_SIZE_SMALL = int(FONT_SIZE * 0.75)
 FONT_SIZE_LARGE = int(FONT_SIZE * 1.25)

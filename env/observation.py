@@ -27,3 +27,4 @@ class EnvObservation:
     truck_pos: tuple[float, float]  # (x, y) position of the truck
     truck_load: int  # current load of the truck
     truck_capacity: int  # capacity of the truck
+    truck_at_depot: bool # whether the truck is currently at the depot

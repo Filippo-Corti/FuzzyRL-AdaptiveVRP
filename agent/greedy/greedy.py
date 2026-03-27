@@ -35,6 +35,7 @@ class GreedyAgent(VRPAgent):
             and node.demand + obs.truck_load <= obs.truck_capacity
         ]
 
+        # In the greedy approach, depot is only available if no other node is
         available_nodes = (
             customer_nodes
             if customer_nodes

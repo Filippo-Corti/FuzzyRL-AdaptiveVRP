@@ -2,6 +2,7 @@ import matplotlib
 
 matplotlib.use("tkagg")
 
+#import random
 import config
 from agent import VRPAgent, greedy, transformer
 from env import VRPEnvironment, Truck

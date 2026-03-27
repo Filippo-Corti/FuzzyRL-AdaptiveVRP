@@ -33,6 +33,7 @@ def run(simulation: VRPSimulation, simulation_factory):
 
     paused = False
     step_once = False
+    episodes = 0
     ms_since_tick = 0
     sim_step_ms = config.SIM_STEP_MS
     dragging_slider = False
@@ -79,28 +80,32 @@ def run(simulation: VRPSimulation, simulation_factory):
             ms_since_tick += dt
 
             if done:
+                R = sum(simulation.agent.rewards)
                 baseline = simulation.compute_baseline()
                 simulation.agent.finish_episode(baseline=baseline)
+                print(f"Episode {episodes} completed (total distance = {R}).")
                 simulation = simulation_factory()
                 done = False
+                episodes += 1
             elif ms_since_tick >= sim_step_ms or step_once:
                 ms_since_tick = 0
                 step_once = False
 
                 reward = simulation.execute_step(record=True)
                 simulation.next_step()
-                done = simulation.environment.graph.orphans_count == 0
+                done = simulation.is_complete()
 
         # --- RENDER ---
-        screen.fill((0, 0, 0))
+        if episodes > 1000:
+            screen.fill((0, 0, 0))
 
-        snapshot = simulation.snapshot()
+            snapshot = simulation.snapshot()
 
-        renderer.draw(snapshot)
-        hud.draw(snapshot)
+            renderer.draw(snapshot)
+            hud.draw(snapshot)
 
-        _draw_controls(screen, paused, sim_step_ms)
-        pygame.display.flip()
+            _draw_controls(screen, paused, sim_step_ms)
+            pygame.display.flip()
 
         tick += 1
 

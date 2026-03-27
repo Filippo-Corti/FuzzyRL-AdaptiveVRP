@@ -22,16 +22,19 @@ class TransformerAgent(VRPAgent):
         self.encoder = Encoder(nodes_features, d_model)
         self.decoder = Decoder(state_features, d_model)
         self.optimizer = torch.optim.Adam(
-            itertools.chain(self.encoder.parameters(), self.decoder.parameters()),
-            lr=1e-4,
+            list(self.encoder.parameters()) + list(self.decoder.parameters()),
+            lr=3e-4,
         )
 
         self.log_probs: list[torch.Tensor] = []
         self.rewards: list[float] = []
         self.last_node: NodeObservation | None = None
 
+        self.encoder.train()
+        self.decoder.train()
+
     def select_node(self, obs: EnvObservation, greedy: bool = False) -> int:
-        log_probs, node_ids = self.forward(obs)
+        log_probs, node_ids = self.forward(obs, greedy)
         log_probs = log_probs.squeeze(0)
         if greedy:
             idx = torch.argmax(log_probs, dim=-1).item()
@@ -78,15 +81,15 @@ class TransformerAgent(VRPAgent):
             epsilon=None,
         )
 
-    def forward(self, obs: EnvObservation) -> tuple[torch.Tensor, list[int]]:
-        nodes_tensor, truck_tensor, mask_tensor = self.obs_to_tensors(obs)
+    def forward(self, obs: EnvObservation, greedy: bool = False) -> tuple[torch.Tensor, list[int]]:
+        nodes_tensor, truck_tensor, mask_tensor = self.obs_to_tensors(obs, greedy)
         node_embeddings = self.encoder(nodes_tensor)
         log_probs = self.decoder(node_embeddings, truck_tensor, mask_tensor)
         node_ids = [node.id for node in obs.nodes]
         return log_probs, node_ids
 
     def obs_to_tensors(
-        self, obs: EnvObservation
+        self, obs: EnvObservation, greedy: bool = False
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Converts the observation into tensors, returning the node features, the truck state and the mask for invalid nodes.
@@ -102,10 +105,11 @@ class TransformerAgent(VRPAgent):
         for node in obs.nodes:
             is_depot = node.depot
             demand_fraction = node.demand / obs.truck_capacity
+            demand_fraction = node.demand / obs.truck_capacity
 
             node_features.append([node.x, node.y, demand_fraction, float(is_depot)])
-            if is_depot:  # TODO: issue here
-                mask.append(False)
+            if is_depot:
+                mask.append(obs.truck_at_depot)
             else:
                 mask.append(node.visited or node.demand > max_demand)
 
@@ -116,4 +120,4 @@ class TransformerAgent(VRPAgent):
         return node_tensors, truck_tensors, mask_tensor
 
     def compute_baseline(self) -> float:
-        return 0.0
+        return 0.0 # Placeholder, as it is actually computed from the outside and passed as baseline
