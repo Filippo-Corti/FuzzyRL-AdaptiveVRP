@@ -61,10 +61,7 @@ def parse_vrp_instance(path: str) -> tuple[VRPGraph, int]:
 
     return graph, capacity
 
-saved = None
 def generate_vrp_instance(num_nodes: int) -> tuple[VRPGraph, int]:
-    if saved:
-        return saved
     depot = VRPNode(id=1, pos=generate_xy(), demand=0, depot=True)
     graph = VRPGraph(depot=depot)
 
@@ -81,4 +78,3 @@ def generate_vrp_instance(num_nodes: int) -> tuple[VRPGraph, int]:
 def generate_xy() -> tuple[float, float]:
     return round(random.uniform(0, 1), 2), round(random.uniform(0, 1), 2)
 
-saved = generate_vrp_instance(12)

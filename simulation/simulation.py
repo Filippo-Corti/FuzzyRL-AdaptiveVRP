@@ -43,14 +43,15 @@ class VRPSimulation:
         :return: whether the simulation is done (all nodes visited)
         """
         reward = 0.0
-        if self.environment.graph.orphans_count != 0:
+        print(f"Executing step {self.is_complete()}")
+        if not self.is_complete():
             reward = self.execute_step()
         self.next_step()
         return self.is_complete(), reward
 
     def execute_step(self, record: bool = False) -> float:
         s = self.environment.get_observation()
-        node_id = self.agent.select_node(s)
+        node_id = self.agent.select_node(s, greedy=True)
 
         if record:
             self.agent.record(s)

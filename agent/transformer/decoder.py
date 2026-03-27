@@ -5,46 +5,40 @@ import math
 
 class Decoder(nn.Module):
     """
-    Builds a query from the current state (input_dim) and uses attention to compute a distribution over the next node to visit.
+    Attention decoder: builds a context vector from truck state attending over
+    node embeddings, then scores each node against that context.
     """
 
     def __init__(self, state_features: int, d_model: int):
-        super(Decoder, self).__init__()
-        self.input_dim = state_features
+        super().__init__()
         self.d_model = d_model
-        self.query_proj = nn.Linear(self.input_dim, self.d_model)
-        self.scores_proj = nn.Linear(self.d_model, self.d_model)
+        self.query_proj = nn.Linear(state_features, d_model)
+        self.scores_proj = nn.Linear(d_model, d_model)
 
     def forward(
         self,
-        node_embeddings: torch.Tensor,  # (batch, N, d_model)
-        query_state: torch.Tensor,  # (batch, input_dim)
-        mask: torch.Tensor,  # (batch, N)
+        node_embeddings: torch.Tensor,  # (B, N, d_model)
+        truck_state: torch.Tensor,       # (B, state_features)
+        mask: torch.Tensor,              # (B, N) True = invalid
     ) -> torch.Tensor:
-        # 1) Build attention scores, using node_embeddings and the query
-        query = self.query_proj(query_state)  # (batch, d_model)
-        query_expanded = query.unsqueeze(
-            1
-        )  # (batch, 1, d_model) <- Required for batch matrix multiplication
+        # Query from truck state
+        query = self.query_proj(truck_state).unsqueeze(1)  # (B, 1, d_model)
 
-        attn_scores = (query_expanded @ node_embeddings.transpose(1, 2)) / math.sqrt(
+        # Attention over node embeddings
+        attn_scores = (query @ node_embeddings.transpose(1, 2)) / math.sqrt(
             self.d_model
-        )  # (batch, 1, N)
+        )  # (B, 1, N)
+        attn_scores = attn_scores.masked_fill(mask.unsqueeze(1), float("-inf"))
+        attn_weights = torch.softmax(attn_scores, dim=-1)  # (B, 1, N)
 
-        attn_scores = attn_scores.masked_fill(
-            mask.unsqueeze(1), float("-inf")
-        )  # Mask out invalid nodes
+        # Context vector
+        context = (attn_weights @ node_embeddings).squeeze(1)  # (B, d_model)
 
-        attn_weights = torch.softmax(attn_scores, dim=-1)  # (batch, 1, N)
-        context = attn_weights @ node_embeddings  # (batch, 1, d_model)
-        context = context.squeeze(1)  # (batch, d_model)
-
-        scores = self.scores_proj(context)
-
-        # 2) Build a distribution over the next node to visit, using the attention scores
+        # Score each node against context
+        scores = self.scores_proj(context)  # (B, d_model)
         logits = (node_embeddings @ scores.unsqueeze(-1)).squeeze(-1) / math.sqrt(
             self.d_model
-        )  # (batch, N, 1)
+        )  # (B, N)
 
         logits = logits.masked_fill(mask, float("-inf"))
-        return torch.log_softmax(logits, dim=-1)
+        return logits  # raw logits, not log_softmax — Categorical handles this

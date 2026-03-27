@@ -1,7 +1,6 @@
 import pygame
 
 from simulation import VRPSimulation
-from .plots import MetricsPlotter
 from .sprites import Sprites
 from .renderer import SimulationUI
 from .hud import HUD
@@ -33,13 +32,10 @@ def run(simulation: VRPSimulation, simulation_factory):
 
     paused = False
     step_once = False
-    episodes = 0
     ms_since_tick = 0
     sim_step_ms = config.SIM_STEP_MS
     dragging_slider = False
     done = False
-
-    tick = 0
 
     while True:
         dt = clock.tick(config.FPS_CAP)
@@ -56,7 +52,7 @@ def run(simulation: VRPSimulation, simulation_factory):
                 if event.key == pygame.K_RIGHT and paused:
                     step_once = True
                 if event.key == pygame.K_r:
-                    simulation = simulation_factory()  # manual reset
+                    simulation = simulation_factory()
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     return
@@ -80,34 +76,20 @@ def run(simulation: VRPSimulation, simulation_factory):
             ms_since_tick += dt
 
             if done:
-                R = sum(simulation.agent.rewards)
-                baseline = simulation.compute_baseline()
-                simulation.agent.finish_episode(baseline=baseline)
-                print(f"Episode {episodes} completed (total distance = {R}).")
                 simulation = simulation_factory()
                 done = False
-                episodes += 1
             elif ms_since_tick >= sim_step_ms or step_once:
                 ms_since_tick = 0
                 step_once = False
-
-                reward = simulation.execute_step(record=True)
-                simulation.next_step()
-                done = simulation.is_complete()
+                done, _ = simulation.step()
 
         # --- RENDER ---
-        if episodes > 1000:
-            screen.fill((0, 0, 0))
-
-            snapshot = simulation.snapshot()
-
-            renderer.draw(snapshot)
-            hud.draw(snapshot)
-
-            _draw_controls(screen, paused, sim_step_ms)
-            pygame.display.flip()
-
-        tick += 1
+        screen.fill((0, 0, 0))
+        snapshot = simulation.snapshot()
+        renderer.draw(snapshot)
+        hud.draw(snapshot)
+        _draw_controls(screen, paused, sim_step_ms)
+        pygame.display.flip()
 
 
 def _slider_handle_rect(sim_step_ms: int) -> pygame.Rect:
@@ -119,53 +101,41 @@ def _slider_handle_rect(sim_step_ms: int) -> pygame.Rect:
 def _draw_controls(screen, paused: bool, sim_step_ms: int):
     font = pygame.font.SysFont("monospace", 11)
 
-    # Hints
     hints = [
         "SPACE  pause / resume",
         "->     step (when paused)",
+        "R      new instance",
         "ESC    quit",
     ]
     for i, h in enumerate(hints):
-        color = (80, 80, 100)
-        surf = font.render(h, True, color)
+        surf = font.render(h, True, (80, 80, 100))
         screen.blit(surf, (10, config.WINDOW_H - 18 * (len(hints) - i)))
 
-    # Paused indicator
     if paused:
         lbl = font.render("PAUSED", True, (240, 180, 60))
         screen.blit(lbl, (10, 10))
 
-    # Speed slider
     speed_label = font.render("speed", True, (120, 120, 140))
     screen.blit(speed_label, (SLIDER_X, SLIDER_Y - 18))
 
-    # Track
     pygame.draw.rect(
-        screen,
-        (60, 60, 80),
+        screen, (60, 60, 80),
         (SLIDER_X, SLIDER_Y, SLIDER_W, SLIDER_H),
         border_radius=4,
     )
 
-    # Fill
     frac = (sim_step_ms - SLIDER_MIN_MS) / (SLIDER_MAX_MS - SLIDER_MIN_MS)
     fill_w = int(frac * SLIDER_W)
     if fill_w > 0:
         pygame.draw.rect(
-            screen,
-            (100, 140, 200),
+            screen, (100, 140, 200),
             (SLIDER_X, SLIDER_Y, fill_w, SLIDER_H),
             border_radius=4,
         )
 
-    # Handle
     handle_rect = _slider_handle_rect(sim_step_ms)
     pygame.draw.rect(screen, (180, 200, 240), handle_rect, border_radius=3)
 
-    # Speed value label
-    if sim_step_ms == 0:
-        speed_val = "max"
-    else:
-        speed_val = f"{sim_step_ms}ms"
+    speed_val = "max" if sim_step_ms == 0 else f"{sim_step_ms}ms"
     val_surf = font.render(speed_val, True, (120, 120, 140))
     screen.blit(val_surf, (SLIDER_X + SLIDER_W + 8, SLIDER_Y - 2))
