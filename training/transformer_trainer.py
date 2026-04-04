@@ -199,6 +199,8 @@ class TransformerTrainer(BaseTrainer):
 
         if kwargs["device"] is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            device = kwargs["device"]
 
         agent = TransformerAgent(
             node_features=4, state_features=3, d_model=kwargs["d_model"], device=device

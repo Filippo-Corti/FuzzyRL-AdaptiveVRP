@@ -1,5 +1,9 @@
-from .transformer_trainer import Trainer
+from .base import BaseTrainer
+from .transformer_trainer import TransformerTrainer
+from .fuzzy_trainer import FuzzyTrainer
 
 __all__ = [
-    "Trainer",
+    "BaseTrainer",
+    "TransformerTrainer",
+    "FuzzyTrainer",
 ]
