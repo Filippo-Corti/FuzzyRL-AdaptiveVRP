@@ -13,8 +13,8 @@ class BatchVRPEnv:
     """
 
     def __init__(self, batch_size: int, num_nodes: int, device: torch.device):
-        self.B = batch_size
-        self.N = num_nodes  # customers only, depot handled separately
+        self.batch_size = batch_size
+        self.num_nodes = num_nodes 
         self.device = device
 
         # Generated fresh each call to reset()
@@ -31,7 +31,7 @@ class BatchVRPEnv:
 
     def reset(self):
         """Generate a new batch of random VRP instances and reset state."""
-        B, N = self.B, self.N
+        B, N = self.batch_size, self.num_nodes
         d = self.device
 
         # Node positions: uniform [0, 1]
@@ -70,11 +70,12 @@ class BatchVRPEnv:
             Depot (index 0): invalid when truck is already at depot
             Customers: invalid when visited or demand > remaining_cap
         """
-        B, N = self.B, self.N
+        B, N = self.batch_size, self.num_nodes
+        d = self.device
 
         # Depot features: demand=0, is_depot=1
-        depot_demand = torch.zeros(B, 1, device=self.device)
-        depot_is_depot = torch.ones(B, 1, device=self.device)
+        depot_demand = torch.zeros(B, 1, device=d)
+        depot_is_depot = torch.ones(B, 1, device=d)
         depot_features = torch.cat([
             self.depot_xy.unsqueeze(1),          # (B, 1, 2)
             depot_demand.unsqueeze(-1),           # (B, 1, 1)
@@ -83,7 +84,7 @@ class BatchVRPEnv:
 
         # Customer features
         demand_frac = self.node_demands / self.capacity.unsqueeze(1)  # (B, N)
-        is_depot = torch.zeros(B, N, device=self.device)
+        is_depot = torch.zeros(B, N, device=d)
         customer_features = torch.cat([
             self.node_xy,                         # (B, N, 2)
             demand_frac.unsqueeze(-1),            # (B, N, 1)
@@ -119,7 +120,7 @@ class BatchVRPEnv:
         actions: (B,) int — index into node_features (0 = depot, 1..N = customers)
         returns: (B,) float — step reward (negative distance)
         """
-        B = self.B
+        B = self.batch_size
         prev_xy = self.truck_xy.clone()
 
         is_depot = (actions == 0)
