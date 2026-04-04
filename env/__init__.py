@@ -1,14 +1,5 @@
-from .environment import VRPEnvironment
-from .graph import VRPNode, VRPGraph
-from .truck import Truck, TruckStatus
-from .observation import EnvObservation, NodeObservation
+from .batch_env import BatchVRPEnv
 
 __all__ = [
-    "VRPEnvironment",
-    "VRPNode",
-    "VRPGraph",
-    "Truck",
-    "TruckStatus",
-    "EnvObservation",
-    "NodeObservation",
+    "BatchVRPEnv",
 ]

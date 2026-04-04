@@ -2,8 +2,8 @@ import torch
 import time
 from pathlib import Path
 
-from agent import transformer
-from training.batch_env import BatchVRPEnv
+from agent import transformer_agent
+from env.batch_env import BatchVRPEnv
 
 
 def train(
@@ -14,9 +14,11 @@ def train(
     save_every: int = 500,
     save_path: str = "checkpoints/transformer.pt",
 ):
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    agent = transformer.TransformerAgent(node_features=4, state_features=3, d_model=d_model)
+    agent = transformer.TransformerAgent(
+        node_features=4, state_features=3, d_model=d_model, device=device
+    )
     env = BatchVRPEnv(batch_size=batch_size, num_nodes=num_nodes, device=device)
 
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
@@ -84,12 +86,15 @@ def train(
             )
 
         if episode % save_every == 0:
-            torch.save({
-                "episode": episode,
-                "encoder": agent.encoder.state_dict(),
-                "decoder": agent.decoder.state_dict(),
-                "optimizer": agent.optimizer.state_dict(),
-            }, save_path)
+            torch.save(
+                {
+                    "episode": episode,
+                    "encoder": agent.encoder.state_dict(),
+                    "decoder": agent.decoder.state_dict(),
+                    "optimizer": agent.optimizer.state_dict(),
+                },
+                save_path,
+            )
             print(f"Saved checkpoint to {save_path}")
 
     return agent

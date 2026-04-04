@@ -3,7 +3,6 @@ This is the state of the simulation that is provided by the environment to the v
 """
 
 from dataclasses import dataclass
-from enum import Enum
 
 PositionSnapshot = tuple[float, float]
 
@@ -40,7 +39,7 @@ class SimulationStats:
 
 @dataclass
 class AgentSnapshot:
-    last_choice: PositionSnapshot
+    last_choice: PositionSnapshot | None
     epsilon: float | None
 
 

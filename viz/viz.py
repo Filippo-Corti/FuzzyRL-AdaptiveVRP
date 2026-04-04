@@ -1,6 +1,5 @@
 import pygame
 
-from simulation import VRPSimulation
 from .sprites import Sprites
 from .renderer import SimulationUI
 from .hud import HUD
@@ -15,7 +14,7 @@ SLIDER_MIN_MS = 0
 SLIDER_MAX_MS = 500
 
 
-def run(simulation: VRPSimulation, simulation_factory):
+def run(simulation, simulation_factory):
     pygame.init()
     pygame.font.init()
 
@@ -119,7 +118,8 @@ def _draw_controls(screen, paused: bool, sim_step_ms: int):
     screen.blit(speed_label, (SLIDER_X, SLIDER_Y - 18))
 
     pygame.draw.rect(
-        screen, (60, 60, 80),
+        screen,
+        (60, 60, 80),
         (SLIDER_X, SLIDER_Y, SLIDER_W, SLIDER_H),
         border_radius=4,
     )
@@ -128,7 +128,8 @@ def _draw_controls(screen, paused: bool, sim_step_ms: int):
     fill_w = int(frac * SLIDER_W)
     if fill_w > 0:
         pygame.draw.rect(
-            screen, (100, 140, 200),
+            screen,
+            (100, 140, 200),
             (SLIDER_X, SLIDER_Y, fill_w, SLIDER_H),
             border_radius=4,
         )

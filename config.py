@@ -1,6 +1,6 @@
 # General Configurations for the VRP Simulation
-NUM_NODES = 12
-NUM_TRUCKS = 5 # Ignore this for now
+NUM_NODES = 10
+NUM_TRUCKS = 5  # Ignore this for now
 TRUCK_CAPACITY = int((NUM_NODES + NUM_TRUCKS - 1) // NUM_TRUCKS * 1.25)
 
 # Disruptions

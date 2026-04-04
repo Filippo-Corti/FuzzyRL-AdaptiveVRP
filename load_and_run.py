@@ -1,5 +1,5 @@
 import torch
-from agent.transformer.transformer import TransformerAgent
+from agent.transformer_agent import TransformerAgent
 from env import VRPEnvironment, Truck
 from simulation import VRPSimulation
 from utils import generate_vrp_instance
