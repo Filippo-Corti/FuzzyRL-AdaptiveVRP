@@ -43,7 +43,6 @@ class VRPSimulation:
         :return: whether the simulation is done (all nodes visited)
         """
         reward = 0.0
-        print(f"Executing step {self.is_complete()}")
         if not self.is_complete():
             reward = self.execute_step()
         self.next_step()

@@ -11,6 +11,28 @@
 [] Eligibility traces + adaptive memberships
 [] Evaluation and ablation study
 
+
+---
+
+Basically I would expect:
+- Animation of the simulation: nodes are houses, the truck moves step by step + a smoother transition from one node to another
+- A training class, just like simulation, that has a run_one_step method of some sort
+- A simulation class that runs the simulation and is linked to the animation in some way
+- Importantly, I want the training and simulation to run at the same time: the training periodically writes the new model and the simulation loads it
+The saved model should be specific for the size we want.
+- I want the HUD to show how the training is behaving and if the model is improving.
+
+Then, my interface should allow to have a menu to choose:
+- The size
+- Pre-trained or live training
+And then we run the simulation, step by step or automatically at a chosen speed
+
+The bonus part would be to use Fuzzy RL to do the same: it also trains and has a simulation running in parallel.
+- In this case, we should allow visually a comparison of some sort
+- Plus I would want to have an interpretation of what is going on
+
+I ALSO WANT BETTER RESULTS CAUSE IT DOES NOT LOOK SO GOOD. I want to penalize crossings, if that makes any sense.
+
 ## Repository Structure
 
 vrp_fuzzy_rl/
