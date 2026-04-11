@@ -5,9 +5,9 @@ from abc import ABC, abstractmethod
 
 import torch
 
-from agent.base import BaseAgent
-from env.batch_env import BatchVRPEnv
-from simulation.snapshot import (
+from ..agent.base import BaseAgent
+from ..env.batch_env import BatchVRPEnv
+from ..simulation.snapshot import (
     AgentSnapshot,
     DepotSnapshot,
     EnvironmentSnapshot,
@@ -72,6 +72,8 @@ class BaseVisualization(ABC):
             torch.manual_seed(self._seed)
         self.env.reset()
 
+        assert self.env.depot_xy is not None
+
         self._route_history = []
         self._total_distance = 0.0
         self._step_count = 0
@@ -90,7 +92,7 @@ class BaseVisualization(ABC):
 
     def randomize(self) -> None:
         """Reset with a new random seed, producing a fresh instance."""
-        self._seed = torch.randint(0, 2**31, (1,)).item()
+        self._seed = int(torch.randint(0, 2**31, (1,)).item())
         self.reset()
 
     def microstep(self) -> SimulationSnapshot:
@@ -119,6 +121,12 @@ class BaseVisualization(ABC):
     def is_done(self) -> bool:
         return self._done
 
+    def set_speed(self, speed: float) -> None:
+        """Update animation speed in a validated way."""
+        if speed <= 0 or speed > 1:
+            raise ValueError("speed must be in (0, 1]")
+        self._speed = speed
+
     # ------------------------------------------------------------------
     # Subclass interface
     # ------------------------------------------------------------------
@@ -145,6 +153,8 @@ class BaseVisualization(ABC):
     # ------------------------------------------------------------------
 
     def _action_to_xy(self, action: torch.Tensor) -> tuple[float, float]:
+        assert self.env.depot_xy is not None
+        assert self.env.node_xy is not None
         a = action[0].item()
         if a == 0:
             xy = self.env.depot_xy[0]
@@ -153,6 +163,7 @@ class BaseVisualization(ABC):
         return (xy[0].item(), xy[1].item())
 
     def _commit_step(self) -> None:
+        assert self._pending_action is not None
         reward = self.env.step(self._pending_action)
         self._total_distance += -reward[0].item()
         self._step_count += 1
@@ -188,13 +199,19 @@ class BaseVisualization(ABC):
     def _build_snapshot(self) -> SimulationSnapshot:
         truck_xy = self._interpolated_truck_xy()
         env = self.env
+        assert env.node_xy is not None
+        assert env.node_demands is not None
+        assert env.visited is not None
+        assert env.depot_xy is not None
+        assert env.capacity is not None
+        assert env.remaining_cap is not None
 
         graph = [
             NodeSnapshot(
                 id=i + 1,
                 pos=(env.node_xy[0, i, 0].item(), env.node_xy[0, i, 1].item()),
                 demand=int(env.node_demands[0, i].item()),
-                visited=env.visited[0, i].item(),
+                visited=bool(env.visited[0, i].item()),
             )
             for i in range(self.num_nodes)
         ]

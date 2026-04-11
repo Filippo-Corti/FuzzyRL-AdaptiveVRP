@@ -13,7 +13,7 @@ Controls:
   R           new random instance (randomize seed)
   Ctrl+R      restart same instance (reset to stored seed)
   +/-         speed up / slow down animation
-  ESC / Q     quit
+  ESC / Q     quit 
 """
 
 from __future__ import annotations
@@ -23,22 +23,23 @@ import time
 import torch
 import pygame
 from pathlib import Path
+from typing import Any, Literal
 
-import config
-from agent import TransformerAgent, FuzzyAgent
-from env.batch_env import BatchVRPEnv
-from training import TransformerTrainer, FuzzyTrainer
-from visualization import TransformerVisualization, FuzzyVisualization
-from viz.renderer import SimulationUI
-from viz.hud import HUD
-from viz.sprites import Sprites
+from src import config
+from src.agent import TransformerAgent, FuzzyAgent
+from src.env.batch_env import BatchVRPEnv
+from src.training import TransformerTrainer, FuzzyTrainer
+from src.visualization import TransformerVisualization, FuzzyVisualization
+from src.viz.renderer import SimulationUI
+from src.viz.hud import HUD
+from src.viz.sprites import Sprites
 
 # ------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------
 
 # Switch between "transformer" and "fuzzy" to change agent
-AGENT_MODE = "transformer"
+AGENT_MODE: Literal["transformer", "fuzzy"] = "fuzzy"
 
 CHECKPOINT_PATH = (
     "checkpoints/transformer.pt"
@@ -66,27 +67,32 @@ SLIDER_MAX_SPEED = 0.15  # cap slider at 0.15; keyboard can go higher
 
 def _run_trainer(checkpoint_path: str, num_nodes: int, batch_size: int = 128):
     """Runs forever in a daemon thread. Behaviour depends on AGENT_MODE."""
+    trainer: TransformerTrainer | FuzzyTrainer
     if AGENT_MODE == "transformer":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        agent = TransformerAgent(
-            node_features=4,
-            state_features=3,
-            d_model=128,
-            device=device,
-        )
-        env = BatchVRPEnv(batch_size=batch_size, num_nodes=num_nodes, device=device)
-        trainer = TransformerTrainer(
-            agent=agent, env=env, save_path=checkpoint_path, save_every=20
-        )
         p = Path(checkpoint_path)
         if p.exists():
-            ckpt = torch.load(checkpoint_path, map_location=device)
-            agent.encoder.load_state_dict(ckpt["encoder"])
-            agent.decoder.load_state_dict(ckpt["decoder"])
-            agent.optimizer.load_state_dict(ckpt["optimizer"])
-            trainer._episode = ckpt.get("episode", 0)
-            trainer._ema_baseline = ckpt.get("ema_baseline", None)
-            print(f"[trainer] resumed from episode {trainer._episode}")
+            trainer = TransformerTrainer.load(
+                checkpoint_path,
+                d_model=128,
+                batch_size=batch_size,
+                num_nodes=num_nodes,
+                save_path=checkpoint_path,
+                save_every=20,
+                device=device,
+            )
+            print(f"[trainer] resumed from episode {trainer.episode}")
+        else:
+            agent = TransformerAgent(
+                node_features=4,
+                state_features=3,
+                d_model=128,
+                device=device,
+            )
+            env = BatchVRPEnv(batch_size=batch_size, num_nodes=num_nodes, device=device)
+            trainer = TransformerTrainer(
+                agent=agent, env=env, save_path=checkpoint_path, save_every=20
+            )
     else:
         device = torch.device("cpu")  # fuzzy is CPU-only
         p = Path(checkpoint_path)
@@ -95,14 +101,15 @@ def _run_trainer(checkpoint_path: str, num_nodes: int, batch_size: int = 128):
                 checkpoint_path,
                 num_nodes=num_nodes,
                 save_path=checkpoint_path,
+                save_every=20,
                 device=device,
             )
-            print(f"[fuzzy trainer] resumed from episode {trainer._episode}")
+            print(f"[fuzzy trainer] resumed from episode {trainer.episode}")
         else:
-            agent = FuzzyAgent()
+            fuzzy_agent = FuzzyAgent()
             env = BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
             trainer = FuzzyTrainer(
-                agent=agent, env=env, save_path=checkpoint_path, save_every=20
+                agent=fuzzy_agent, env=env, save_path=checkpoint_path, save_every=20
             )
 
     trainer.train(num_episodes=999_999)
@@ -124,8 +131,8 @@ def _draw_controls(
     surface: pygame.Surface,
     paused: bool,
     speed: float,
-    font: pygame.font.Font,
-    checkpoint_episode: int,
+    font: Any,
+    checkpoint_episode: float,
 ):
     # Slider track
     pygame.draw.line(
@@ -167,6 +174,7 @@ def run(num_nodes: int = config.NUM_NODES):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     p = Path(CHECKPOINT_PATH)
 
+    viz: TransformerVisualization | FuzzyVisualization
     if AGENT_MODE == "transformer":
         if p.exists():
             viz = TransformerVisualization.load_agent(
@@ -191,9 +199,9 @@ def run(num_nodes: int = config.NUM_NODES):
             )
             print(f"[main] loaded fuzzy checkpoint from {CHECKPOINT_PATH}")
         else:
-            agent = FuzzyAgent()
+            fuzzy_agent = FuzzyAgent()
             viz = FuzzyVisualization(
-                agent=agent,
+                agent=fuzzy_agent,
                 num_nodes=num_nodes,
                 device=torch.device("cpu"),
                 speed=DEFAULT_SPEED,
@@ -205,7 +213,7 @@ def run(num_nodes: int = config.NUM_NODES):
     # Track checkpoint mtime for hot-reload
     last_mtime: float = p.stat().st_mtime if p.exists() else 0.0
     last_poll_time: float = time.time()
-    checkpoint_episode: int = 0
+    checkpoint_episode: float = 0.0
     pending_reload: bool = False  # True when a new checkpoint is waiting to load
 
     # --- Pygame setup ---
@@ -260,11 +268,11 @@ def run(num_nodes: int = config.NUM_NODES):
 
                 if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
                     speed = min(speed + SPEED_STEP, SPEED_MAX)
-                    viz._speed = speed
+                    viz.set_speed(speed)
 
                 if event.key == pygame.K_MINUS:
                     speed = max(speed - SPEED_STEP, SPEED_MIN)
-                    viz._speed = speed
+                    viz.set_speed(speed)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if _slider_handle_rect(speed).collidepoint(event.pos):
@@ -277,7 +285,7 @@ def run(num_nodes: int = config.NUM_NODES):
                 rel_x = max(SLIDER_X, min(event.pos[0], SLIDER_X + SLIDER_W))
                 frac = (rel_x - SLIDER_X) / SLIDER_W
                 speed = SLIDER_MIN_SPEED + frac * (SLIDER_MAX_SPEED - SLIDER_MIN_SPEED)
-                viz._speed = speed
+                viz.set_speed(speed)
 
         # --- Checkpoint hot-reload ---
         now = time.time()
@@ -296,18 +304,12 @@ def run(num_nodes: int = config.NUM_NODES):
             if viz.is_done():
                 if pending_reload:
                     try:
-                        if AGENT_MODE == "transformer":
-                            ckpt = torch.load(CHECKPOINT_PATH, map_location=device)
-                            viz.agent.encoder.load_state_dict(ckpt["encoder"])
-                            viz.agent.decoder.load_state_dict(ckpt["decoder"])
-                            viz.agent.eval()
-                            checkpoint_episode = ckpt.get("episode", 0)
+                        if isinstance(viz, TransformerVisualization):
+                            checkpoint_episode = viz.reload_checkpoint(
+                                CHECKPOINT_PATH, device
+                            )
                         else:
-                            new_agent = FuzzyAgent.load(CHECKPOINT_PATH)
-                            viz.agent = new_agent
-                            checkpoint_episode = (
-                                viz.agent.epsilon
-                            )  # show epsilon as proxy
+                            checkpoint_episode = viz.reload_checkpoint(CHECKPOINT_PATH)
                         print(
                             f"[main] reloaded checkpoint (episode {checkpoint_episode})"
                         )

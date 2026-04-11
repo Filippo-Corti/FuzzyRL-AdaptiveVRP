@@ -1,8 +1,8 @@
 import pygame
 
-import config
-from simulation import snapshot
-from viz import colors
+from .. import config
+from ..simulation import snapshot
+from . import colors
 
 
 class HUD:

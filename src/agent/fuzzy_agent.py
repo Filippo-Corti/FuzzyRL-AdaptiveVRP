@@ -111,10 +111,11 @@ class FuzzyAgent(BaseAgent):
         signals, candidates = self._extract_signals(node_features, truck_state, mask)
         if signals is None:
             # All customers masked and depot is the only option
-            action_idx = 0
             self._last_state_weights = None
             self._last_action = 0
             return torch.tensor([0]), torch.zeros(1)
+
+        assert candidates is not None
 
         state_weights = self._get_state_weights(signals)
         q_values = self._aggregate_q(state_weights)
@@ -150,6 +151,7 @@ class FuzzyAgent(BaseAgent):
         """Perform a Q-learning update for the last transition."""
         if self._last_state_weights is None:
             return
+        assert self._last_action is not None
 
         # Next state Q-values
         if done:
@@ -188,7 +190,7 @@ class FuzzyAgent(BaseAgent):
             )
 
     @classmethod
-    def load(cls, path: str, device: torch.device = None) -> "FuzzyAgent":
+    def load(cls, path: str, device: torch.device | None = None) -> "FuzzyAgent":
         import pickle
 
         with open(path, "rb") as f:
@@ -207,7 +209,7 @@ class FuzzyAgent(BaseAgent):
         node_features: torch.Tensor,  # (1, N+1, 4)
         truck_state: torch.Tensor,  # (1, 3)
         mask: torch.Tensor,  # (1, N+1) bool
-    ) -> tuple[dict | None, list[int] | None]:
+    ) -> tuple[dict[str, float] | None, list[int] | None]:
         """
         Extract the 7 fuzzy signals from raw tensors.
 
@@ -260,7 +262,7 @@ class FuzzyAgent(BaseAgent):
         }
 
         # env action indices are 1-based (0 = depot)
-        candidates = [idx.item() + 1 for idx in top_indices]
+        candidates = [int(idx.item()) + 1 for idx in top_indices]
         return signals, candidates
 
     def _get_state_weights(self, signals: dict) -> list[tuple[tuple, float]]:
@@ -279,7 +281,7 @@ class FuzzyAgent(BaseAgent):
             per_signal.append(memberships)
 
         # Cartesian product of activated labels, weighted by product of memberships
-        state_weights = [({}, 1.0)]
+        state_weights: list[tuple[dict[int, str], float]] = [({}, 1.0)]
         for memberships in per_signal:
             new_state_weights = []
             for partial_key, partial_weight in state_weights:

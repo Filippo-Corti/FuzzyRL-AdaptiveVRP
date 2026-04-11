@@ -6,7 +6,7 @@ import torch
 from .base import BaseAgent
 from .encoder import Encoder
 from .decoder import Decoder
-from simulation.snapshot import AgentSnapshot
+from ..simulation.snapshot import AgentSnapshot
 
 
 class TransformerAgent(BaseAgent):
@@ -71,11 +71,33 @@ class TransformerAgent(BaseAgent):
         return actions, log_probs
 
     def save(self, path: str) -> None:
-        pass
+        torch.save(
+            {
+                "node_features": self.encoder.input_proj.in_features,
+                "state_features": self.decoder.query_proj.in_features,
+                "d_model": self.encoder.input_proj.out_features,
+                "encoder": self.encoder.state_dict(),
+                "decoder": self.decoder.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: str, device: torch.device) -> "TransformerAgent":
-        pass
+        ckpt = torch.load(path, map_location=device)
+        agent = cls(
+            node_features=ckpt.get("node_features", 4),
+            state_features=ckpt.get("state_features", 3),
+            d_model=ckpt.get("d_model", 128),
+            device=device,
+        )
+        agent.encoder.load_state_dict(ckpt["encoder"])
+        agent.decoder.load_state_dict(ckpt["decoder"])
+        optimizer_state = ckpt.get("optimizer")
+        if optimizer_state is not None:
+            agent.optimizer.load_state_dict(optimizer_state)
+        return agent
 
     def finish_episode(self, baseline: float | None = None):
         """Used only during single-instance viz mode."""

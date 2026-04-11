@@ -17,16 +17,16 @@ class BatchVRPEnv:
         self.device = device
 
         # Generated fresh each call to reset()
-        self.node_xy: torch.Tensor = None  # (B, N, 2)
-        self.node_demands: torch.Tensor = None  # (B, N)
-        self.depot_xy: torch.Tensor = None  # (B, 2)
-        self.capacity: torch.Tensor = None  # (B,)
+        self.node_xy: torch.Tensor | None = None  # (B, N, 2)
+        self.node_demands: torch.Tensor | None = None  # (B, N)
+        self.depot_xy: torch.Tensor | None = None  # (B, 2)
+        self.capacity: torch.Tensor | None = None  # (B,)
 
         # Dynamic state
-        self.visited: torch.Tensor = None  # (B, N) bool
-        self.remaining_cap: torch.Tensor = None  # (B,)
-        self.truck_xy: torch.Tensor = None  # (B, 2)
-        self.at_depot: torch.Tensor = None  # (B,) bool
+        self.visited: torch.Tensor | None = None  # (B, N) bool
+        self.remaining_cap: torch.Tensor | None = None  # (B,)
+        self.truck_xy: torch.Tensor | None = None  # (B, 2)
+        self.at_depot: torch.Tensor | None = None  # (B,) bool
 
     def reset(self):
         """Generate a new batch of random VRP instances and reset state."""
@@ -71,6 +71,15 @@ class BatchVRPEnv:
         """
         B, N = self.batch_size, self.num_nodes
         d = self.device
+
+        assert self.depot_xy is not None
+        assert self.node_xy is not None
+        assert self.node_demands is not None
+        assert self.capacity is not None
+        assert self.visited is not None
+        assert self.remaining_cap is not None
+        assert self.truck_xy is not None
+        assert self.at_depot is not None
 
         # Depot features: demand=0, is_depot=1
         depot_demand = torch.zeros(B, 1, device=d)
@@ -130,6 +139,15 @@ class BatchVRPEnv:
         actions: (B,) int — index into node_features (0 = depot, 1..N = customers)
         returns: (B,) float — step reward (negative distance)
         """
+        assert self.truck_xy is not None
+        assert self.depot_xy is not None
+        assert self.remaining_cap is not None
+        assert self.capacity is not None
+        assert self.node_xy is not None
+        assert self.node_demands is not None
+        assert self.visited is not None
+        assert self.at_depot is not None
+
         B = self.batch_size
         prev_xy = self.truck_xy.clone()
 
@@ -160,7 +178,9 @@ class BatchVRPEnv:
 
     def is_done(self) -> torch.Tensor:
         """(B,) bool — True when all customers visited and truck at depot."""
+        assert self.visited is not None
+        assert self.at_depot is not None
         return self.visited.all(dim=1) & self.at_depot
 
     def all_done(self) -> bool:
-        return self.is_done().all().item()
+        return bool(self.is_done().all().item())

@@ -1,0 +1,9 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingImports": true,
+  "include": [
+    "main.py",
+    "src"
+  ]
+}

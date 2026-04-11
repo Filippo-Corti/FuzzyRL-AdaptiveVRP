@@ -4,8 +4,8 @@ import time
 import torch
 from pathlib import Path
 
-from agent.fuzzy_agent import FuzzyAgent
-from env.batch_env import BatchVRPEnv
+from ..agent.fuzzy_agent import FuzzyAgent
+from ..env.batch_env import BatchVRPEnv
 from .base import BaseTrainer
 
 
@@ -46,6 +46,10 @@ class FuzzyTrainer(BaseTrainer):
         self._reward_ema: float | None = None
         self._ema_alpha: float = 0.05
 
+    @property
+    def episode(self) -> int:
+        return self._episode
+
     # ------------------------------------------------------------------
     # BaseTrainer interface
     # ------------------------------------------------------------------
@@ -62,6 +66,9 @@ class FuzzyTrainer(BaseTrainer):
 
     def step(self) -> dict:
         nf, ts, mk = self._node_features, self._truck_state, self._mask
+        assert nf is not None
+        assert ts is not None
+        assert mk is not None
 
         # Agent selects action (stores last state/action internally)
         actions, _ = self.agent.select_action(nf, ts, mk, greedy=False)
@@ -153,20 +160,33 @@ class FuzzyTrainer(BaseTrainer):
     def load(
         cls,
         path: str,
-        **kwargs,
+        **kwargs: object,
     ) -> "FuzzyTrainer":
-        if kwargs["device"] is None:
+        num_nodes_obj = kwargs["num_nodes"]
+        save_path_obj = kwargs["save_path"]
+        save_every_obj = kwargs["save_every"]
+
+        assert isinstance(num_nodes_obj, int)
+        assert isinstance(save_path_obj, str)
+        assert isinstance(save_every_obj, int)
+
+        num_nodes = num_nodes_obj
+        save_path = save_path_obj
+        save_every = save_every_obj
+        device = kwargs.get("device")
+
+        if device is None:
             device = torch.device("cpu")  # fuzzy agent is CPU-only
         else:
-            device = kwargs["device"]
+            assert isinstance(device, torch.device)
 
         agent = FuzzyAgent.load(path, device=device)
-        env = BatchVRPEnv(batch_size=1, num_nodes=kwargs["num_nodes"], device=device)
+        env = BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
         trainer = cls(
             agent=agent,
             env=env,
-            save_path=kwargs["save_path"],
-            save_every=kwargs["save_every"],
+            save_path=save_path,
+            save_every=save_every,
         )
         meta_path = path + ".meta"
         if Path(meta_path).exists():

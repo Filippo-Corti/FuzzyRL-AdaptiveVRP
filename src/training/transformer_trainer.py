@@ -4,8 +4,8 @@ import time
 import torch
 from pathlib import Path
 
-from agent.transformer_agent import TransformerAgent
-from env.batch_env import BatchVRPEnv
+from ..agent.transformer_agent import TransformerAgent
+from ..env.batch_env import BatchVRPEnv
 from .base import BaseTrainer
 
 
@@ -42,6 +42,10 @@ class TransformerTrainer(BaseTrainer):
         self._episode: int = 0
         self._adv_ema: float | None = None
         self._adv_ema_alpha: float = 0.05  # same smoothing as baseline
+
+    @property
+    def episode(self) -> int:
+        return self._episode
 
     # ------------------------------------------------------------------
     # Step-by-step interface
@@ -88,6 +92,8 @@ class TransformerTrainer(BaseTrainer):
         )
         rewards = self.env.step(actions)
 
+        assert self._sampled_rewards is not None
+        assert self._baseline_rewards is not None
         self._sampled_rewards += rewards
         self._log_probs_list.append(log_probs)
 
@@ -107,6 +113,8 @@ class TransformerTrainer(BaseTrainer):
         Should only be called after all_done() is True.
         Returns the scalar loss value.
         """
+        assert self._sampled_rewards is not None
+        assert self._baseline_rewards is not None
         advantage = self._sampled_rewards - self._baseline_rewards  # (B,)
         log_probs_total = torch.stack(self._log_probs_list, dim=0).sum(dim=0)  # (B,)
         loss = -(advantage.detach() * log_probs_total).mean()
@@ -162,6 +170,8 @@ class TransformerTrainer(BaseTrainer):
             elapsed = time.time() - t0
 
             if ep % 15 == 0:
+                assert self._sampled_rewards is not None
+                assert self._baseline_rewards is not None
                 print(
                     f"Episode {ep:5d} | "
                     f"sampled={self._sampled_rewards.mean():.3f} | "
@@ -194,20 +204,43 @@ class TransformerTrainer(BaseTrainer):
         )
 
     @classmethod
-    def load(cls, path: str, **kwargs) -> "TransformerTrainer":
+    def load(
+        cls,
+        path: str,
+        **kwargs: object,
+    ) -> "TransformerTrainer":
         """Reconstruct a Trainer from a checkpoint file."""
 
-        if kwargs["device"] is None:
+        d_model_obj = kwargs["d_model"]
+        batch_size_obj = kwargs["batch_size"]
+        num_nodes_obj = kwargs["num_nodes"]
+        save_path_obj = kwargs["save_path"]
+        save_every_obj = kwargs["save_every"]
+
+        assert isinstance(d_model_obj, int)
+        assert isinstance(batch_size_obj, int)
+        assert isinstance(num_nodes_obj, int)
+        assert isinstance(save_path_obj, str)
+        assert isinstance(save_every_obj, int)
+
+        d_model = d_model_obj
+        batch_size = batch_size_obj
+        num_nodes = num_nodes_obj
+        save_path = save_path_obj
+        save_every = save_every_obj
+        device = kwargs.get("device")
+
+        if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
-            device = kwargs["device"]
+            assert isinstance(device, torch.device)
 
         agent = TransformerAgent(
-            node_features=4, state_features=3, d_model=kwargs["d_model"], device=device
+            node_features=4, state_features=3, d_model=d_model, device=device
         )
         env = BatchVRPEnv(
-            batch_size=kwargs["batch_size"],
-            num_nodes=kwargs["num_nodes"],
+            batch_size=batch_size,
+            num_nodes=num_nodes,
             device=device,
         )
 
@@ -216,8 +249,6 @@ class TransformerTrainer(BaseTrainer):
         agent.decoder.load_state_dict(ckpt["decoder"])
         agent.optimizer.load_state_dict(ckpt["optimizer"])
 
-        trainer = cls(
-            agent, env, save_path=kwargs["save_path"], save_every=kwargs["save_every"]
-        )
+        trainer = cls(agent, env, save_path=save_path, save_every=save_every)
         trainer._episode = ckpt.get("episode", 0)
         return trainer
