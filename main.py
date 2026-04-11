@@ -38,7 +38,7 @@ from viz.sprites import Sprites
 # ------------------------------------------------------------------
 
 # Switch between "transformer" and "fuzzy" to change agent
-AGENT_MODE = "fuzzy"
+AGENT_MODE = "transformer"
 
 CHECKPOINT_PATH = (
     "checkpoints/transformer.pt"
