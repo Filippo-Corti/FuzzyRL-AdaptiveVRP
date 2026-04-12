@@ -12,6 +12,16 @@
 [] Evaluation and ablation study
 
 
+---
+
+Some other notes once again:
+- I need to check the visualization package as I have not checked it yet.
+- I need to find a way to pass some information about the training to the visualization, so that I can plot the baseline and the adv_ema on the HUD.
+- I want a better way to uniformly configure the characteristics of the instances I am running on. These are the parameters of the BatchEnv but they should be shared across training and visualization.
+- I need to check if the trained metrics actually improve over time.
+- I want to add an exact solver for the VRP instances I am visualizing, so that I can show those stats as well on the HUD.
+
+
 
 ---
 

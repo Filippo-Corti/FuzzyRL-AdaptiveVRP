@@ -4,7 +4,7 @@ from typing import Literal
 
 
 @dataclass
-class BatchStaticInstance:
+class BatchInstanceData:
     """Static, per-instance tensors sampled at episode reset."""
 
     node_xy: torch.Tensor  # (B, N, 2)
@@ -14,7 +14,7 @@ class BatchStaticInstance:
 
 
 @dataclass
-class BatchDynamicState:
+class BatchSolutionData:
     """Dynamic tensors updated at every environment step."""
 
     visited: torch.Tensor  # (B, N) bool
@@ -62,7 +62,7 @@ class BatchVRPEnv:
         depot_mode: Literal["center", "random"] = "center",
         node_xy_range: tuple[float, float] = (0.0, 1.0),
         demand_range: tuple[int, int] = (1, 1),
-        capacity_range: tuple[int, int] = (2, 5),
+        capacity_range: tuple[int, int] = (3, 7),
     ):
         self.batch_size = batch_size
         self.num_nodes = num_nodes
@@ -72,8 +72,8 @@ class BatchVRPEnv:
         self.demand_range = demand_range
         self.capacity_range = capacity_range
 
-        self.static: BatchStaticInstance | None = None
-        self.dynamic: BatchDynamicState | None = None
+        self.static: BatchInstanceData | None = None
+        self.dynamic: BatchSolutionData | None = None
 
     @property
     def node_xy(self) -> torch.Tensor | None:
@@ -128,7 +128,7 @@ class BatchVRPEnv:
         cap_min, cap_max = self.capacity_range
         capacity = torch.randint(cap_min, cap_max + 1, (B,), device=d).float()
 
-        self.static = BatchStaticInstance(
+        self.static = BatchInstanceData(
             node_xy=node_xy,
             node_demands=node_demands,
             depot_xy=depot_xy,
@@ -136,14 +136,14 @@ class BatchVRPEnv:
         )
 
         # Reset dynamic state
-        self.dynamic = BatchDynamicState(
+        self.dynamic = BatchSolutionData(
             visited=torch.zeros(B, N, dtype=torch.bool, device=d),
             remaining_cap=capacity.clone(),
             truck_xy=depot_xy.clone(),
             at_depot=torch.ones(B, dtype=torch.bool, device=d),
         )
 
-    def _assert_ready(self) -> tuple[BatchStaticInstance, BatchDynamicState]:
+    def _assert_ready(self) -> tuple[BatchInstanceData, BatchSolutionData]:
         assert self.static is not None
         assert self.dynamic is not None
         return self.static, self.dynamic

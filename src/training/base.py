@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Callable
 
 
 class BaseTrainer(ABC):
@@ -40,7 +41,11 @@ class BaseTrainer(ABC):
         pass
 
     @abstractmethod
-    def train(self, num_episodes: int) -> None:
+    def train(
+        self,
+        num_episodes: int,
+        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+    ) -> None:
         """Run the full training loop."""
         pass
 

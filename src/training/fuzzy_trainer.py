@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import torch
 from pathlib import Path
+from typing import Callable
 
 from ..agent.base import AgentObservation as PolicyObservation
 from ..agent.fuzzy.agent import FuzzyAgent
@@ -48,6 +49,11 @@ class FuzzyTrainer(BaseTrainer):
     @property
     def episode(self) -> int:
         return self._episode
+
+    def _checkpoint_path_for_episode(self, episode: int) -> Path:
+        return self.save_path.with_name(
+            f"{self.save_path.stem}-{episode}{self.save_path.suffix}"
+        )
 
     # ------------------------------------------------------------------
     # BaseTrainer interface
@@ -117,11 +123,18 @@ class FuzzyTrainer(BaseTrainer):
     def is_done(self) -> bool:
         return self.env.all_done()
 
-    def train(self, num_episodes: int) -> None:
+    def train(
+        self,
+        num_episodes: int,
+        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+    ) -> None:
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
-        print(f"[fuzzy] Training: {num_episodes} episodes, nodes={self.env.num_nodes}")
+        print(
+            f"[fuzzy] Training: {num_episodes} episodes from episode {self._episode}, "
+            f"nodes={self.env.num_nodes}"
+        )
 
-        for ep in range(1, num_episodes + 1):
+        for _ in range(num_episodes):
             t0 = time.time()
 
             self.reset_episode()
@@ -130,12 +143,15 @@ class FuzzyTrainer(BaseTrainer):
                     break
                 self.step()
             reward = self.update()
+            current_episode = self._episode
+            if progress_callback is not None:
+                progress_callback({"episode": current_episode})
 
             elapsed = time.time() - t0
 
-            if ep % 500 == 0:
+            if current_episode % 500 == 0:
                 print(
-                    f"Episode {ep:6d} | "
+                    f"Episode {current_episode:6d} | "
                     f"reward={reward:.3f} | "
                     f"ema={self._reward_ema:.3f} | "
                     f"epsilon={self.agent.epsilon:.3f} | "
@@ -143,12 +159,15 @@ class FuzzyTrainer(BaseTrainer):
                     f"{elapsed:.3f}s"
                 )
 
-            if ep % self.save_every == 0:
+            if current_episode % self.save_every == 0:
                 self.save()
-                print(f"[fuzzy] Saved checkpoint → {self.save_path}")
+                print(
+                    "[fuzzy] Saved checkpoint → "
+                    f"{self._checkpoint_path_for_episode(current_episode)}"
+                )
 
     def save(self, path: str | None = None) -> None:
-        p = Path(path) if path else self.save_path
+        p = Path(path) if path else self._checkpoint_path_for_episode(self._episode)
         self.agent.save(str(p))
         # Save trainer metadata alongside agent in a companion file
         torch.save(

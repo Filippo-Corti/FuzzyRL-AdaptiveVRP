@@ -37,7 +37,7 @@ class FuzzyVisualization(BaseVisualization):
         seed_obj = kwargs.get("seed", 42)
 
         assert isinstance(speed_obj, (int, float))
-        assert isinstance(seed_obj, int)
+        assert isinstance(seed_obj, (int, type(None)))
 
         speed = float(speed_obj)
         seed = seed_obj

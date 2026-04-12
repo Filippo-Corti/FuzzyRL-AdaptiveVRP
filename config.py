@@ -1,5 +1,5 @@
 # General Configurations for the VRP Simulation
-NUM_NODES = 10
+NUM_NODES = 20
 NUM_TRUCKS = 5  # Ignore this for now
 TRUCK_CAPACITY = int((NUM_NODES + NUM_TRUCKS - 1) // NUM_TRUCKS * 1.25)
 
@@ -36,11 +36,17 @@ PLOT_EVERY = 1000
 AGENT_MODE = "transformer"  # "transformer" or "fuzzy"
 CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"
 CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"
+SEED = None  # Set to an int for visualizing the same instance
 POLL_INTERVAL_S = 2.0
 DEFAULT_SPEED = 0.04
 SPEED_STEP = 0.01
 SPEED_MIN = 0.005
 SPEED_MAX = 1.0
+
+# Trainer runtime execution settings
+TRAINER_BATCH_SIZE = 128
+TRAINER_SAVE_EVERY = 100
+TRAINER_TORCH_THREADS = 1
 
 # Speed slider geometry
 SLIDER_X = 20

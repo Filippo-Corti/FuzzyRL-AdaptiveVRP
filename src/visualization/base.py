@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-
+from importlib import import_module
 import torch
 
 from ..agent.base import BaseAgent
@@ -45,7 +45,7 @@ class BaseVisualization(ABC):
         device: torch.device,
         env: BatchVRPEnv | None = None,
         speed: float = 0.05,
-        seed: int = 42,
+        seed: int | None = None,
     ):
         if speed <= 0 or speed > 1:
             raise ValueError("speed must be in (0, 1]")
@@ -69,6 +69,7 @@ class BaseVisualization(ABC):
         self._total_distance: float = 0.0
         self._step_count: int = 0
         self._done: bool = False
+        self._exact_cost: float | None = None
         self._current_snapshot: SimulationSnapshot | None = None
 
     # ------------------------------------------------------------------
@@ -87,6 +88,7 @@ class BaseVisualization(ABC):
         self._total_distance = 0.0
         self._step_count = 0
         self._done = False
+        self._exact_cost = self._compute_exact_cost_with_ortools(time_limit_s=1)
         self._current_snapshot = None
 
         depot = self.env.depot_xy[0]
@@ -121,6 +123,17 @@ class BaseVisualization(ABC):
         if self._t >= 1.0:
             self._advance_env_step()
 
+        self._current_snapshot = self._build_snapshot()
+
+    def step_once(self) -> None:
+        """Advance exactly one full environment step (to the next node)."""
+        if self._done:
+            self._current_snapshot = self._build_snapshot()
+            return
+
+        # Complete the current segment immediately, then commit one env step.
+        self._t = 1.0
+        self._advance_env_step()
         self._current_snapshot = self._build_snapshot()
 
     def current_snapshot(self) -> SimulationSnapshot:
@@ -273,5 +286,96 @@ class BaseVisualization(ABC):
                 orphans=0,
                 total_nodes=self.num_nodes,
                 total_distance=self._total_distance,
+                exact_cost=self._exact_cost,
             ),
         )
+
+    def _compute_exact_cost_with_ortools(
+        self,
+        time_limit_s: int,
+    ) -> float | None:
+        """Solve current visualized instance with OR-Tools and return cost."""
+        try:
+            pywrapcp = import_module("ortools.constraint_solver.pywrapcp")
+            routing_enums_pb2 = import_module(
+                "ortools.constraint_solver.routing_enums_pb2"
+            )
+        except Exception:
+            return None
+
+        assert self.env.depot_xy is not None
+        assert self.env.node_xy is not None
+        assert self.env.node_demands is not None
+        assert self.env.capacity is not None
+
+        depot = self.env.depot_xy[0]
+        customers_xy = self.env.node_xy[0]
+        demands = self.env.node_demands[0]
+        capacity = int(self.env.capacity[0].item())
+
+        coords: list[tuple[float, float]] = [
+            (float(depot[0].item()), float(depot[1].item()))
+        ]
+        coords.extend(
+            (float(customers_xy[i, 0].item()), float(customers_xy[i, 1].item()))
+            for i in range(self.num_nodes)
+        )
+        node_demands = [0]
+        node_demands.extend(int(demands[i].item()) for i in range(self.num_nodes))
+
+        # OR-Tools uses integer arc costs; scale Euclidean distances to keep precision.
+        dist_scale = 10_000
+        n_points = len(coords)
+        dist_matrix: list[list[int]] = [[0 for _ in range(n_points)] for _ in range(n_points)]
+        for i in range(n_points):
+            xi, yi = coords[i]
+            for j in range(n_points):
+                if i == j:
+                    continue
+                xj, yj = coords[j]
+                d = math.sqrt((xi - xj) ** 2 + (yi - yj) ** 2)
+                dist_matrix[i][j] = int(round(d * dist_scale))
+
+        num_vehicles = self.num_nodes
+        manager = pywrapcp.RoutingIndexManager(n_points, num_vehicles, 0)
+        routing = pywrapcp.RoutingModel(manager)
+
+        def distance_callback(from_index: int, to_index: int) -> int:
+            from_node = manager.IndexToNode(from_index)
+            to_node = manager.IndexToNode(to_index)
+            return dist_matrix[from_node][to_node]
+
+        transit_cb_index = routing.RegisterTransitCallback(distance_callback)
+        routing.SetArcCostEvaluatorOfAllVehicles(transit_cb_index)
+
+        def demand_callback(from_index: int) -> int:
+            from_node = manager.IndexToNode(from_index)
+            return node_demands[from_node]
+
+        demand_cb_index = routing.RegisterUnaryTransitCallback(demand_callback)
+        routing.AddDimensionWithVehicleCapacity(
+            demand_cb_index,
+            0,
+            [capacity] * num_vehicles,
+            True,
+            "Capacity",
+        )
+
+        search_params = pywrapcp.DefaultRoutingSearchParameters()
+        search_params.first_solution_strategy = (
+            routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        )
+        search_params.local_search_metaheuristic = (
+            routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+        )
+        search_params.time_limit.FromSeconds(max(1, int(time_limit_s)))
+
+        try:
+            solution = routing.SolveWithParameters(search_params)
+        except Exception:
+            return None
+
+        if solution is None:
+            return None
+
+        return float(solution.ObjectiveValue()) / float(dist_scale)

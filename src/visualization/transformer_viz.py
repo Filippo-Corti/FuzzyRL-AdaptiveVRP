@@ -40,7 +40,7 @@ class TransformerVisualization(BaseVisualization):
 
         assert isinstance(d_model_obj, int)
         assert isinstance(speed_obj, (int, float))
-        assert isinstance(seed_obj, int)
+        assert isinstance(seed_obj, (int, type(None)))
 
         d_model = d_model_obj
         speed = float(speed_obj)

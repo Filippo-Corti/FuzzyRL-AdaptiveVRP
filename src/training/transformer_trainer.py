@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import torch
 from pathlib import Path
+from typing import Callable
 
 from ..agent.base import AgentObservation
 from ..agent.transformer.agent import TransformerAgent
@@ -41,13 +42,20 @@ class TransformerTrainer(BaseTrainer):
         self._baseline_rewards: torch.Tensor | None = None
 
         self._episode: int = 0
+        self._baseline_ema: float | None = None
+        self._baseline_ema_alpha: float = 0.05
         self._adv_ema: float | None = None
-        self._adv_ema_alpha: float = 0.05  # same smoothing as baseline
+        self._adv_ema_alpha: float = 0.05
 
     def _assert_episode_ready(self) -> tuple[torch.Tensor, torch.Tensor]:
         assert self._sampled_rewards is not None
         assert self._baseline_rewards is not None
         return self._sampled_rewards, self._baseline_rewards
+
+    def _checkpoint_path_for_episode(self, episode: int) -> Path:
+        return self.save_path.with_name(
+            f"{self.save_path.stem}-{episode}{self.save_path.suffix}"
+        )
 
     @property
     def episode(self) -> int:
@@ -135,6 +143,14 @@ class TransformerTrainer(BaseTrainer):
         self.agent.optimizer.step()
 
         self._episode += 1
+        baseline_mean = baseline_rewards.mean().item()
+        if self._baseline_ema is None:
+            self._baseline_ema = baseline_mean
+        else:
+            self._baseline_ema = (
+                1 - self._baseline_ema_alpha
+            ) * self._baseline_ema + self._baseline_ema_alpha * baseline_mean
+
         adv_mean = advantage.mean().item()
         if self._adv_ema is None:
             self._adv_ema = adv_mean
@@ -152,18 +168,22 @@ class TransformerTrainer(BaseTrainer):
     # Full-loop interface
     # ------------------------------------------------------------------
 
-    def train(self, num_episodes: int) -> None:
+    def train(
+        self,
+        num_episodes: int,
+        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+    ) -> None:
         """
         Run the full training loop for num_episodes episodes.
         Handles logging and checkpointing.
         """
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
         print(
-            f"Training: {num_episodes} episodes, "
+            f"Training: {num_episodes} episodes from episode {self._episode}, "
             f"batch={self.env.batch_size}, nodes={self.env.num_nodes}"
         )
 
-        for ep in range(1, num_episodes + 1):
+        for _ in range(num_episodes):
             t0 = time.time()
 
             self.reset_episode()
@@ -172,32 +192,45 @@ class TransformerTrainer(BaseTrainer):
             for _ in range(self.env.num_nodes * 4):
                 self.step()
             loss = self.update()
+            current_episode = self._episode
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "episode": current_episode,
+                        "baseline": self._baseline_ema,
+                        "adv_ema": self._adv_ema,
+                    }
+                )
 
             elapsed = time.time() - t0
 
-            if ep % 15 == 0:
+            if current_episode % 25 == 0:
                 assert self._sampled_rewards is not None
                 assert self._baseline_rewards is not None
                 print(
-                    f"Episode {ep:5d} | "
+                    f"Episode {current_episode:5d} | "
                     f"sampled={self._sampled_rewards.mean():.3f} | "
                     f"baseline={self._baseline_rewards.mean():.3f} | "
+                    f"baseline_ema={self._baseline_ema:.3f} | "
                     f"adv={(self._sampled_rewards - self._baseline_rewards).mean():.3f} | "
                     f"adv_ema={self._adv_ema:.3f} | "
                     f"loss={loss:.4f} | "
                     f"{elapsed:.2f}s"
                 )
 
-            if ep % self.save_every == 0:
+            if current_episode % self.save_every == 0:
                 self.save()
-                print(f"Saved checkpoint → {self.save_path}")
+                print(
+                    "Saved checkpoint → "
+                    f"{self._checkpoint_path_for_episode(current_episode)}"
+                )
 
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 
     def save(self, path: str | None = None) -> None:
-        p = Path(path) if path else self.save_path
+        p = Path(path) if path else self._checkpoint_path_for_episode(self._episode)
         p.parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {

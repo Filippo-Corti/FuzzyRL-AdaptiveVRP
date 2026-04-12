@@ -33,6 +33,7 @@ class SimulationStats:
     orphans: int
     total_nodes: int
     total_distance: float
+    exact_cost: float | None = None
 
 
 @dataclass
