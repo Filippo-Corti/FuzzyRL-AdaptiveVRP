@@ -17,6 +17,7 @@ class NodeSnapshot:
 class TruckSnapshot:
     id: int
     pos: PositionSnapshot
+    heading_deg: float
     load: int
     capacity: int
     routes: list[list[PositionSnapshot]]

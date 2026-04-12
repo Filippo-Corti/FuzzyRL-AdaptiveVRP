@@ -251,6 +251,22 @@ class BaseVisualization(ABC):
         )
         return (x, y)
 
+    def _truck_heading_deg(self) -> float:
+        """Heading angle in degrees from the truck's current direction of travel."""
+        dx = self._segment.destination_xy[0] - self._segment.origin_xy[0]
+        dy = self._segment.destination_xy[1] - self._segment.origin_xy[1]
+        if abs(dx) > 1e-9 or abs(dy) > 1e-9:
+            return math.degrees(math.atan2(dy, dx))
+
+        if len(self._route_history) >= 2:
+            (x0, y0), (x1, y1) = self._route_history[-2], self._route_history[-1]
+            dx2 = x1 - x0
+            dy2 = y1 - y0
+            if abs(dx2) > 1e-9 or abs(dy2) > 1e-9:
+                return math.degrees(math.atan2(dy2, dx2))
+
+        return 0.0
+
     def _build_snapshot(self) -> SimulationSnapshot:
         truck_xy = self._interpolated_truck_xy()
         env = self.env
@@ -277,6 +293,7 @@ class BaseVisualization(ABC):
         truck = TruckSnapshot(
             id=0,
             pos=truck_xy,
+            heading_deg=self._truck_heading_deg(),
             load=int((env.capacity[0] - env.remaining_cap[0]).item()),
             capacity=int(env.capacity[0].item()),
             routes=[list(self._route_history)],

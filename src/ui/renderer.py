@@ -66,6 +66,7 @@ class VRPRenderer:
             self.surface,
             self._to_screen(*truck.pos),
             color,
+            truck.heading_deg,
             broken=False,
             fraction=truck.load / truck.capacity if truck.capacity > 0 else 0,
         )

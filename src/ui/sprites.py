@@ -5,7 +5,8 @@ from . import colors
 
 class Sprites:
 
-    truck = pygame.image.load("assets/sprites/truck.png")
+    truck = pygame.image.load("assets/sprites/truck.png") # 219x80 pixels
+    house = pygame.image.load("assets/sprites/house.png") # 163x128 pixels
 
     def __init__(self):
         pass
@@ -13,6 +14,7 @@ class Sprites:
     @classmethod
     def init(cls):
         cls.truck = pygame.transform.scale(cls.truck.convert_alpha(), (80, 30))
+        cls.house = pygame.transform.scale(cls.house.convert_alpha(), (60, 84))
 
     @classmethod
     def draw_truck(
@@ -20,31 +22,43 @@ class Sprites:
         surface: pygame.Surface,
         pos: pygame.Vector2,
         color: pygame.Color,
+        heading_deg: float = 0.0,
         broken: bool = False,
         fraction: float = 0.0,
     ):
         x, y = int(pos.x), int(pos.y)
 
-        tinted_sprite = cls.tint_image(cls.truck, color)
-        rect = tinted_sprite.get_rect(center=(x, y))
-        surface.blit(tinted_sprite, rect)
+        truck_surface = cls.tint_image(cls.truck, color)
 
-        # Draw a bar on top of the truck to indicate load
+        # Draw load bar directly on truck surface so it rotates with the truck.
         bar_w, bar_h = 43, 26
-        bx, by = x - bar_w // 2 + 16, y - 13
-        pygame.draw.rect(surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
+        bx, by = 35, 2
+        pygame.draw.rect(truck_surface, colors.HUD_BAR_BG, (bx, by, bar_w, bar_h))
         fill_w = int(bar_w * min(max(fraction, 0), 1))
         if fill_w > 0:
-            pygame.draw.rect(surface, color, (bx, by, fill_w, bar_h))
+            pygame.draw.rect(truck_surface, color, (bx, by, fill_w, bar_h))
 
-        # If broken, draw an X over the truck
+        # If broken, draw an X over the bar area; this also rotates with the truck.
         if broken:
             pygame.draw.line(
-                surface, colors.TRUCK_BROKEN, (bx, by), (bx + bar_w, by + bar_h), 3
+                truck_surface,
+                colors.TRUCK_BROKEN,
+                (bx, by),
+                (bx + bar_w, by + bar_h),
+                3,
             )
             pygame.draw.line(
-                surface, colors.TRUCK_BROKEN, (bx + bar_w, by), (bx, by + bar_h), 3
+                truck_surface,
+                colors.TRUCK_BROKEN,
+                (bx + bar_w, by),
+                (bx, by + bar_h),
+                3,
             )
+
+        # Sprite default orientation is left-facing, so apply a 180deg offset.
+        rotated_sprite = pygame.transform.rotate(truck_surface, heading_deg + 180.0)
+        rect = rotated_sprite.get_rect(center=(x, y))
+        surface.blit(rotated_sprite, rect)
 
     @classmethod
     def draw_depot(
@@ -72,7 +86,11 @@ class Sprites:
         color: pygame.Color,
         radius: int = 10,
     ):
-        pygame.draw.circle(surface, color, (int(pos[0]), int(pos[1])), radius)
+        _ = radius
+        x, y = int(pos[0]), int(pos[1])
+        tinted_sprite = cls.tint_image(cls.house, color)
+        rect = tinted_sprite.get_rect(center=(x, y))
+        surface.blit(tinted_sprite, rect)
 
     @staticmethod
     def tint_image(image, color):
