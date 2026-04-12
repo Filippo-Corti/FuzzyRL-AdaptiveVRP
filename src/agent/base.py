@@ -1,7 +1,25 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import torch
+
+
+@dataclass
+class AgentObservation:
+    """Semantic wrapper for the tensors consumed by policies."""
+
+    node_features: torch.Tensor  # (B, N+1, 4)
+    truck_state: torch.Tensor  # (B, 3)
+    mask: torch.Tensor  # (B, N+1) bool
+
+
+@dataclass
+class AgentDecision:
+    """Semantic wrapper for selected actions and their log probabilities."""
+
+    actions: torch.Tensor  # (B,) int
+    log_probs: torch.Tensor  # (B,) float
 
 
 class BaseAgent(ABC):
@@ -17,20 +35,25 @@ class BaseAgent(ABC):
     @abstractmethod
     def select_action(
         self,
-        node_features: torch.Tensor,  # (B, N+1, 4)
-        truck_state: torch.Tensor,  # (B, 3)
-        mask: torch.Tensor,  # (B, N+1) bool
+        observation: AgentObservation,
         greedy: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> AgentDecision:
         """
         Select actions for a batch of instances.
 
         Returns:
-            actions:   (B,) int   — index into node_features (0=depot, 1..N=customer)
-            log_probs: (B,) float — log probability of each action.
-                                    Return zeros if not applicable.
+            AgentDecision with:
+                actions:   (B,) int   — index into node_features (0=depot, 1..N=customer)
+                log_probs: (B,) float — log probability of each action.
+                                        Return zeros if not applicable.
         """
         pass
+
+    def eval(self) -> None:
+        """Optional hook for agents with train/eval mode."""
+
+    def train(self) -> None:
+        """Optional hook for agents with train/eval mode."""
 
     @abstractmethod
     def save(self, path: str) -> None:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from ..agent.fuzzy_agent import FuzzyAgent
+from ..agent.base import AgentObservation
+from ..agent.fuzzy.agent import FuzzyAgent
 from .base import BaseVisualization
 
 
@@ -14,11 +15,16 @@ class FuzzyVisualization(BaseVisualization):
     """
 
     def _select_action(self) -> torch.Tensor:
-        node_features, truck_state, mask = self.env.get_state()
-        actions, _ = self.agent.select_action(
-            node_features, truck_state, mask, greedy=True
+        env_obs = self.env.get_state()
+        decision = self.agent.select_action(
+            AgentObservation(
+                node_features=env_obs.node_features,
+                truck_state=env_obs.truck_state,
+                mask=env_obs.mask,
+            ),
+            greedy=True,
         )
-        return actions  # (1,)
+        return decision.actions  # (1,)
 
     @classmethod
     def load_agent(
@@ -45,6 +51,11 @@ class FuzzyVisualization(BaseVisualization):
             agent=agent, num_nodes=num_nodes, device=device, speed=speed, seed=seed
         )
 
-    def reload_checkpoint(self, checkpoint_path: str) -> float:
-        self.agent = FuzzyAgent.load(checkpoint_path)
+    def _reload_agent_state(
+        self,
+        checkpoint_path: str,
+        device: torch.device | None = None,
+    ) -> float:
+        load_device = device if device is not None else self.device
+        self.agent = FuzzyAgent.load(checkpoint_path, device=load_device)
         return float(self.agent.epsilon)

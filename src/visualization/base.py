@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import torch
 
 from ..agent.base import BaseAgent
 from ..env.batch_env import BatchVRPEnv
-from ..simulation.snapshot import (
+from .snapshot import (
     AgentSnapshot,
     DepotSnapshot,
     EnvironmentSnapshot,
@@ -16,6 +17,14 @@ from ..simulation.snapshot import (
     SimulationStats,
     TruckSnapshot,
 )
+
+
+@dataclass
+class MotionSegment:
+    """Current full-step segment used by microstep interpolation."""
+
+    origin_xy: tuple[float, float]
+    destination_xy: tuple[float, float]
 
 
 class BaseVisualization(ABC):
@@ -34,6 +43,7 @@ class BaseVisualization(ABC):
         agent: BaseAgent,
         num_nodes: int,
         device: torch.device,
+        env: BatchVRPEnv | None = None,
         speed: float = 0.05,
         seed: int = 42,
     ):
@@ -46,11 +56,10 @@ class BaseVisualization(ABC):
         self._speed = speed
         self._seed: int | None = seed
 
-        self.env = BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
+        self.env = env or BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
 
         # Animation state
-        self._from_xy: tuple[float, float] = (0.0, 0.0)
-        self._to_xy: tuple[float, float] = (0.0, 0.0)
+        self._segment = MotionSegment(origin_xy=(0.0, 0.0), destination_xy=(0.0, 0.0))
         self._t: float = 1.0
         self._step_speed: float = 1.0
 
@@ -84,9 +93,11 @@ class BaseVisualization(ABC):
         start = (depot[0].item(), depot[1].item())
         self._route_history.append(start)
 
-        self._from_xy = start
         self._pending_action = self._select_action()
-        self._to_xy = self._action_to_xy(self._pending_action)
+        self._segment = MotionSegment(
+            origin_xy=start,
+            destination_xy=self._target_xy_for_action(self._pending_action),
+        )
         self._t = 0.0
         self._step_speed = self._compute_step_speed()
 
@@ -95,22 +106,22 @@ class BaseVisualization(ABC):
         self._seed = int(torch.randint(0, 2**31, (1,)).item())
         self.reset()
 
-    def microstep(self) -> SimulationSnapshot:
+    def microstep(self) -> None:
         """
-        Advance animation by one frame and return the current snapshot.
+        Advance animation by one frame.
         If the truck arrives at its destination, commits the env step and
-        selects the next action before returning.
+        selects the next action.
         """
         if self._done:
-            return self._build_snapshot()
+            self._current_snapshot = self._build_snapshot()
+            return
 
         self._t = min(self._t + self._step_speed, 1.0)
 
         if self._t >= 1.0:
-            self._commit_step()
+            self._advance_env_step()
 
         self._current_snapshot = self._build_snapshot()
-        return self._current_snapshot
 
     def current_snapshot(self) -> SimulationSnapshot:
         """Return the most recently built snapshot without advancing state."""
@@ -138,7 +149,7 @@ class BaseVisualization(ABC):
         Subclasses call self.agent.select_action with whatever preprocessing
         their agent requires.
         """
-        ...
+        pass
 
     @classmethod
     @abstractmethod
@@ -146,13 +157,29 @@ class BaseVisualization(ABC):
         cls, checkpoint_path: str, num_nodes: int, **kwargs
     ) -> "BaseVisualization":
         """Construct a Visualization from a saved checkpoint."""
-        ...
+        pass
+
+    @abstractmethod
+    def _reload_agent_state(
+        self,
+        checkpoint_path: str,
+        device: torch.device | None = None,
+    ) -> float:
+        """Reload model parameters from checkpoint and return a display metric."""
+        pass
+
+    def reload_checkpoint(
+        self,
+        checkpoint_path: str,
+        device: torch.device | None = None,
+    ) -> float:
+        return self._reload_agent_state(checkpoint_path=checkpoint_path, device=device)
 
     # ------------------------------------------------------------------
     # Shared animation internals
     # ------------------------------------------------------------------
 
-    def _action_to_xy(self, action: torch.Tensor) -> tuple[float, float]:
+    def _target_xy_for_action(self, action: torch.Tensor) -> tuple[float, float]:
         assert self.env.depot_xy is not None
         assert self.env.node_xy is not None
         a = action[0].item()
@@ -162,15 +189,15 @@ class BaseVisualization(ABC):
             xy = self.env.node_xy[0, int(a) - 1]
         return (xy[0].item(), xy[1].item())
 
-    def _commit_step(self) -> None:
+    def _advance_env_step(self) -> None:
         assert self._pending_action is not None
         reward = self.env.step(self._pending_action)
         self._total_distance += -reward[0].item()
         self._step_count += 1
 
-        arrival = self._action_to_xy(self._pending_action)
+        arrival = self._target_xy_for_action(self._pending_action)
         self._route_history.append(arrival)
-        self._from_xy = arrival
+        self._segment.origin_xy = arrival
 
         if self.env.all_done():
             self._done = True
@@ -178,13 +205,13 @@ class BaseVisualization(ABC):
             return
 
         self._pending_action = self._select_action()
-        self._to_xy = self._action_to_xy(self._pending_action)
+        self._segment.destination_xy = self._target_xy_for_action(self._pending_action)
         self._t = 0.0
         self._step_speed = self._compute_step_speed()
 
     def _compute_step_speed(self) -> float:
-        dx = self._to_xy[0] - self._from_xy[0]
-        dy = self._to_xy[1] - self._from_xy[1]
+        dx = self._segment.destination_xy[0] - self._segment.origin_xy[0]
+        dy = self._segment.destination_xy[1] - self._segment.origin_xy[1]
         dist = math.sqrt(dx * dx + dy * dy)
         if dist < 1e-6:
             return 1.0
@@ -192,8 +219,12 @@ class BaseVisualization(ABC):
 
     def _interpolated_truck_xy(self) -> tuple[float, float]:
         t = self._t
-        x = self._from_xy[0] + t * (self._to_xy[0] - self._from_xy[0])
-        y = self._from_xy[1] + t * (self._to_xy[1] - self._from_xy[1])
+        x = self._segment.origin_xy[0] + t * (
+            self._segment.destination_xy[0] - self._segment.origin_xy[0]
+        )
+        y = self._segment.origin_xy[1] + t * (
+            self._segment.destination_xy[1] - self._segment.origin_xy[1]
+        )
         return (x, y)
 
     def _build_snapshot(self) -> SimulationSnapshot:
@@ -230,7 +261,11 @@ class BaseVisualization(ABC):
         return SimulationSnapshot(
             environment=EnvironmentSnapshot(graph=graph, truck=truck, depot=depot),
             agent=AgentSnapshot(
-                last_choice=self._to_xy if not self._done else self._from_xy,
+                last_choice=(
+                    self._segment.destination_xy
+                    if not self._done
+                    else self._segment.origin_xy
+                ),
                 epsilon=None,
             ),
             stats=SimulationStats(

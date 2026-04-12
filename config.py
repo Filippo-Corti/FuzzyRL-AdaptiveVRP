@@ -31,3 +31,19 @@ FONT_SIZE = 25
 FONT_SIZE_SMALL = int(FONT_SIZE * 0.75)
 FONT_SIZE_LARGE = int(FONT_SIZE * 1.25)
 PLOT_EVERY = 1000
+
+# Main runtime configuration
+AGENT_MODE = "transformer"  # "transformer" or "fuzzy"
+CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"
+CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"
+POLL_INTERVAL_S = 2.0
+DEFAULT_SPEED = 0.04
+SPEED_STEP = 0.01
+SPEED_MIN = 0.005
+SPEED_MAX = 1.0
+
+# Speed slider geometry
+SLIDER_X = 20
+SLIDER_Y_OFFSET = 40
+SLIDER_W = 300
+SLIDER_MAX_SPEED = 0.15

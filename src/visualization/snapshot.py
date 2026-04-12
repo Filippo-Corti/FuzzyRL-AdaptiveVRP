@@ -1,6 +1,4 @@
-"""
-This is the state of the simulation that is provided by the environment to the visualization package
-"""
+"""Snapshot dataclasses shared by visualization and UI rendering."""
 
 from dataclasses import dataclass
 

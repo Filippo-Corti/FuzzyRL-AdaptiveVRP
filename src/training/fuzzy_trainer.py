@@ -4,8 +4,9 @@ import time
 import torch
 from pathlib import Path
 
-from ..agent.fuzzy_agent import FuzzyAgent
-from ..env.batch_env import BatchVRPEnv
+from ..agent.base import AgentObservation as PolicyObservation
+from ..agent.fuzzy.agent import FuzzyAgent
+from ..env.batch_env import AgentObservation, BatchVRPEnv
 from .base import BaseTrainer
 
 
@@ -38,9 +39,7 @@ class FuzzyTrainer(BaseTrainer):
         self._steps: int = 0
 
         # Store current state tensors for Q-update in step()
-        self._node_features: torch.Tensor | None = None
-        self._truck_state: torch.Tensor | None = None
-        self._mask: torch.Tensor | None = None
+        self._observation: AgentObservation | None = None
 
         # Running average reward for logging
         self._reward_ema: float | None = None
@@ -59,43 +58,43 @@ class FuzzyTrainer(BaseTrainer):
         self._total_reward = 0.0
         self._steps = 0
         # Cache initial state
-        nf, ts, mk = self.env.get_state()
-        self._node_features = nf
-        self._truck_state = ts
-        self._mask = mk
+        self._observation = self.env.get_state()
 
-    def step(self) -> dict:
-        nf, ts, mk = self._node_features, self._truck_state, self._mask
-        assert nf is not None
-        assert ts is not None
-        assert mk is not None
+    def step(self) -> None:
+        observation = self._observation
+        assert observation is not None
 
         # Agent selects action (stores last state/action internally)
-        actions, _ = self.agent.select_action(nf, ts, mk, greedy=False)
+        decision = self.agent.select_action(
+            PolicyObservation(
+                node_features=observation.node_features,
+                truck_state=observation.truck_state,
+                mask=observation.mask,
+            ),
+            greedy=False,
+        )
 
         # Step env
-        reward = self.env.step(actions)
+        reward = self.env.step(decision.actions)
         r = reward[0].item()
         self._total_reward += r
         self._steps += 1
 
         # Get next state
         done = self.env.all_done()
-        next_nf, next_ts, next_mk = self.env.get_state()
+        next_obs = self.env.get_state()
 
         # Q-update
-        self.agent.q_update(r, next_nf, next_ts, next_mk, done)
+        self.agent.q_update(
+            r,
+            next_obs.node_features,
+            next_obs.truck_state,
+            next_obs.mask,
+            done,
+        )
 
         # Advance cached state
-        self._node_features = next_nf
-        self._truck_state = next_ts
-        self._mask = next_mk
-
-        return {
-            "total_reward": self._total_reward,
-            "steps": self._steps,
-            "epsilon": self.agent.epsilon,
-        }
+        self._observation = next_obs
 
     def update(self) -> float:
         """

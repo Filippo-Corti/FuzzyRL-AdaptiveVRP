@@ -1,7 +1,7 @@
 import pygame
 
-from .. import config
-from ..simulation import snapshot
+import config
+from ..visualization import snapshot
 from . import colors
 
 

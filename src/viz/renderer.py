@@ -1,9 +1,9 @@
 import pygame
 
-from .. import config
+import config
 from . import colors
 from .sprites import Sprites
-from ..simulation import snapshot
+from ..visualization import snapshot
 
 
 class SimulationUI:

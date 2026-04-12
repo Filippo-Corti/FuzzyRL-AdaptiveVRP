@@ -4,7 +4,8 @@ import time
 import torch
 from pathlib import Path
 
-from ..agent.transformer_agent import TransformerAgent
+from ..agent.base import AgentObservation
+from ..agent.transformer.agent import TransformerAgent
 from ..env.batch_env import BatchVRPEnv
 from .base import BaseTrainer
 
@@ -43,6 +44,11 @@ class TransformerTrainer(BaseTrainer):
         self._adv_ema: float | None = None
         self._adv_ema_alpha: float = 0.05  # same smoothing as baseline
 
+    def _assert_episode_ready(self) -> tuple[torch.Tensor, torch.Tensor]:
+        assert self._sampled_rewards is not None
+        assert self._baseline_rewards is not None
+        return self._sampled_rewards, self._baseline_rewards
+
     @property
     def episode(self) -> int:
         return self._episode
@@ -66,11 +72,16 @@ class TransformerTrainer(BaseTrainer):
         baseline = torch.zeros(B, device=d)
         with torch.no_grad():
             while not self.env.all_done():
-                node_features, truck_state, mask = self.env.get_state()
-                actions, _ = self.agent.select_action(
-                    node_features, truck_state, mask, greedy=True
+                env_obs = self.env.get_state()
+                decision = self.agent.select_action(
+                    AgentObservation(
+                        node_features=env_obs.node_features,
+                        truck_state=env_obs.truck_state,
+                        mask=env_obs.mask,
+                    ),
+                    greedy=True,
                 )
-                baseline += self.env.step(actions)
+                baseline += self.env.step(decision.actions)
         self._baseline_rewards = baseline
 
         # --- Reset for sampled rollout ---
@@ -78,7 +89,7 @@ class TransformerTrainer(BaseTrainer):
         self._sampled_rewards = torch.zeros(B, device=d)
         self._log_probs_list = []
 
-    def step(self) -> dict:
+    def step(self) -> None:
         """
         Execute one env step of the sampled rollout.
 
@@ -86,25 +97,20 @@ class TransformerTrainer(BaseTrainer):
 
         Returns a metrics dict with current running totals.
         """
-        node_features, truck_state, mask = self.env.get_state()
-        actions, log_probs = self.agent.select_action(
-            node_features, truck_state, mask, greedy=False
+        env_obs = self.env.get_state()
+        decision = self.agent.select_action(
+            AgentObservation(
+                node_features=env_obs.node_features,
+                truck_state=env_obs.truck_state,
+                mask=env_obs.mask,
+            ),
+            greedy=False,
         )
-        rewards = self.env.step(actions)
+        rewards = self.env.step(decision.actions)
 
-        assert self._sampled_rewards is not None
-        assert self._baseline_rewards is not None
-        self._sampled_rewards += rewards
-        self._log_probs_list.append(log_probs)
-
-        return {
-            "sampled_reward_mean": self._sampled_rewards.mean().item(),
-            "baseline_reward_mean": self._baseline_rewards.mean().item(),
-            "advantage_mean": (self._sampled_rewards - self._baseline_rewards)
-            .mean()
-            .item(),
-            "steps_taken": len(self._log_probs_list),
-        }
+        sampled_rewards, _ = self._assert_episode_ready()
+        sampled_rewards += rewards
+        self._log_probs_list.append(decision.log_probs)
 
     def update(self) -> float:
         """
@@ -113,14 +119,14 @@ class TransformerTrainer(BaseTrainer):
         Should only be called after all_done() is True.
         Returns the scalar loss value.
         """
-        assert self._sampled_rewards is not None
-        assert self._baseline_rewards is not None
-        advantage = self._sampled_rewards - self._baseline_rewards  # (B,)
+        sampled_rewards, baseline_rewards = self._assert_episode_ready()
+        advantage = sampled_rewards - baseline_rewards  # (B,)
         log_probs_total = torch.stack(self._log_probs_list, dim=0).sum(dim=0)  # (B,)
         loss = -(advantage.detach() * log_probs_total).mean()
 
         self.agent.optimizer.zero_grad()
         loss.backward()
+        # Clip global gradient norm to avoid unstable policy updates and NaN logits.
         torch.nn.utils.clip_grad_norm_(
             list(self.agent.encoder.parameters())
             + list(self.agent.decoder.parameters()),

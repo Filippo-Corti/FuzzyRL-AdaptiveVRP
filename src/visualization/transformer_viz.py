@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from ..agent.transformer_agent import TransformerAgent
+from ..agent.base import AgentObservation
+from ..agent.transformer.agent import TransformerAgent
 from .base import BaseVisualization
 
 
@@ -15,11 +16,16 @@ class TransformerVisualization(BaseVisualization):
 
     def _select_action(self) -> torch.Tensor:
         with torch.no_grad():
-            node_features, truck_state, mask = self.env.get_state()
-            actions, _ = self.agent.select_action(
-                node_features, truck_state, mask, greedy=True
+            env_obs = self.env.get_state()
+            decision = self.agent.select_action(
+                AgentObservation(
+                    node_features=env_obs.node_features,
+                    truck_state=env_obs.truck_state,
+                    mask=env_obs.mask,
+                ),
+                greedy=True,
             )
-        return actions  # (1,)
+        return decision.actions  # (1,)
 
     @classmethod
     def load_agent(
@@ -57,12 +63,17 @@ class TransformerVisualization(BaseVisualization):
             agent=agent, num_nodes=num_nodes, device=device, speed=speed, seed=seed
         )
 
-    def reload_checkpoint(self, checkpoint_path: str, device: torch.device) -> int:
+    def _reload_agent_state(
+        self,
+        checkpoint_path: str,
+        device: torch.device | None = None,
+    ) -> float:
         agent = self.agent
         if not isinstance(agent, TransformerAgent):
             raise TypeError("TransformerVisualization requires a TransformerAgent")
-        ckpt = torch.load(checkpoint_path, map_location=device)
+        map_device = device if device is not None else self.device
+        ckpt = torch.load(checkpoint_path, map_location=map_device)
         agent.encoder.load_state_dict(ckpt["encoder"])
         agent.decoder.load_state_dict(ckpt["decoder"])
         agent.eval()
-        return int(ckpt.get("episode", 0))
+        return float(ckpt.get("episode", 0))
