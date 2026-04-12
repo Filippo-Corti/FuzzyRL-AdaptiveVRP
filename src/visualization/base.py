@@ -4,6 +4,9 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from importlib import import_module
+from typing import Literal, cast
+
+import config
 import torch
 
 from ..agent.base import BaseAgent
@@ -56,7 +59,15 @@ class BaseVisualization(ABC):
         self._speed = speed
         self._seed: int | None = seed
 
-        self.env = env or BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
+        self.env = env or BatchVRPEnv(
+            batch_size=1,
+            num_nodes=num_nodes,
+            device=device,
+            depot_mode=cast(Literal["center", "random"], config.ENV_DEPOT_MODE),
+            node_xy_range=config.ENV_NODE_XY_RANGE,
+            demand_range=config.ENV_DEMAND_RANGE,
+            capacity_range=config.ENV_CAPACITY_RANGE,
+        )
 
         # Animation state
         self._segment = MotionSegment(origin_xy=(0.0, 0.0), destination_xy=(0.0, 0.0))

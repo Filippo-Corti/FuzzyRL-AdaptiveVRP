@@ -3,8 +3,9 @@ from __future__ import annotations
 import time
 import torch
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal, cast
 
+import config
 from ..agent.base import AgentObservation
 from ..agent.transformer.agent import TransformerAgent
 from ..env.batch_env import BatchVRPEnv
@@ -281,6 +282,10 @@ class TransformerTrainer(BaseTrainer):
             batch_size=batch_size,
             num_nodes=num_nodes,
             device=device,
+            depot_mode=cast(Literal["center", "random"], config.ENV_DEPOT_MODE),
+            node_xy_range=config.ENV_NODE_XY_RANGE,
+            demand_range=config.ENV_DEMAND_RANGE,
+            capacity_range=config.ENV_CAPACITY_RANGE,
         )
 
         ckpt = torch.load(path, map_location=device)

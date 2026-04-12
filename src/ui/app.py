@@ -6,7 +6,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import pygame
 import torch
@@ -359,6 +359,10 @@ def _run_trainer_worker(
                 batch_size=batch_size,
                 num_nodes=num_nodes,
                 device=device,
+                depot_mode=cast(Literal["center", "random"], config.ENV_DEPOT_MODE),
+                node_xy_range=config.ENV_NODE_XY_RANGE,
+                demand_range=config.ENV_DEMAND_RANGE,
+                capacity_range=config.ENV_CAPACITY_RANGE,
             )
             trainer = TransformerTrainer(
                 agent=agent,
@@ -383,6 +387,10 @@ def _run_trainer_worker(
                 batch_size=1,
                 num_nodes=num_nodes,
                 device=device,
+                depot_mode=cast(Literal["center", "random"], config.ENV_DEPOT_MODE),
+                node_xy_range=config.ENV_NODE_XY_RANGE,
+                demand_range=config.ENV_DEMAND_RANGE,
+                capacity_range=config.ENV_CAPACITY_RANGE,
             )
             trainer = FuzzyTrainer(
                 agent=fuzzy_agent,

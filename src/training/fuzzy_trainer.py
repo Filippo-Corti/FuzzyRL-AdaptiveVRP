@@ -3,8 +3,9 @@ from __future__ import annotations
 import time
 import torch
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal, cast
 
+import config
 from ..agent.base import AgentObservation as PolicyObservation
 from ..agent.fuzzy.agent import FuzzyAgent
 from ..env.batch_env import AgentObservation, BatchVRPEnv
@@ -199,7 +200,15 @@ class FuzzyTrainer(BaseTrainer):
             assert isinstance(device, torch.device)
 
         agent = FuzzyAgent.load(path, device=device)
-        env = BatchVRPEnv(batch_size=1, num_nodes=num_nodes, device=device)
+        env = BatchVRPEnv(
+            batch_size=1,
+            num_nodes=num_nodes,
+            device=device,
+            depot_mode=cast(Literal["center", "random"], config.ENV_DEPOT_MODE),
+            node_xy_range=config.ENV_NODE_XY_RANGE,
+            demand_range=config.ENV_DEMAND_RANGE,
+            capacity_range=config.ENV_CAPACITY_RANGE,
+        )
         trainer = cls(
             agent=agent,
             env=env,
