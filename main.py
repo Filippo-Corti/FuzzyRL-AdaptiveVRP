@@ -16,9 +16,8 @@ def run(num_nodes: int = config.NUM_NODES) -> None:
     else:
         checkpoint_path = config.CHECKPOINT_FUZZY_PATH
 
-    agent_mode = cast(Literal["transformer", "fuzzy"], config.AGENT_MODE)
     app_cfg = AppConfig(
-        agent_mode=agent_mode,
+        agent_mode=config.AGENT_MODE,
         checkpoint_path=checkpoint_path,
         poll_interval_s=config.POLL_INTERVAL_S,
         default_speed=config.DEFAULT_SPEED,

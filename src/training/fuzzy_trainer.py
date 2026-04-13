@@ -40,18 +40,24 @@ class FuzzyTrainer(BaseTrainer):
         self._total_reward: float = 0.0
         self._steps: int = 0
 
-        # Store current state tensors for Q-update in step()
         self._observation: AgentObservation | None = None
 
-        # Running average reward for logging
         self._reward_ema: float | None = None
         self._ema_alpha: float = 0.05
-        self._action_counts: dict[str, int] = {
-            "nearest": 0,
-            "second": 0,
-            "third": 0,
-            "depot": 0,
-        }
+
+        # Counts for the current episode only — reset in reset_episode()
+        self._action_counts: dict[str, int] = self._fresh_action_counts()
+
+        # Cumulative counts across all episodes — for overall distribution logging
+        self._action_counts_total: dict[str, int] = self._fresh_action_counts()
+
+        # Rolling window of per-episode distributions for stable UI display
+        self._action_dist_window: list[dict[str, float]] = []
+        self._action_dist_window_size: int = 50
+
+    @staticmethod
+    def _fresh_action_counts() -> dict[str, int]:
+        return {"nearest": 0, "isolated": 0, "detour": 0}
 
     @property
     def episode(self) -> int:
@@ -70,14 +76,13 @@ class FuzzyTrainer(BaseTrainer):
         self.env.reset()
         self._total_reward = 0.0
         self._steps = 0
-        # Cache initial state
+        self._action_counts = self._fresh_action_counts()
         self._observation = self.env.get_state()
 
     def step(self) -> None:
         assert self._observation is not None
         observation = self._observation
 
-        # Agent selects action (stores last state/action internally)
         decision = self.agent.select_action(
             AgentObservation(
                 node_features=observation.node_features,
@@ -90,24 +95,22 @@ class FuzzyTrainer(BaseTrainer):
         chosen = self.agent.last_fuzzy_action
         if chosen == 0:
             self._action_counts["nearest"] += 1
+            self._action_counts_total["nearest"] += 1
         elif chosen == 1:
-            self._action_counts["second"] += 1
+            self._action_counts["isolated"] += 1
+            self._action_counts_total["isolated"] += 1
         elif chosen == 2:
-            self._action_counts["third"] += 1
-        elif chosen == 3:
-            self._action_counts["depot"] += 1
+            self._action_counts["detour"] += 1
+            self._action_counts_total["detour"] += 1
 
-        # Step env
         reward = self.env.step(decision.actions)
         r = reward[0].item()
         self._total_reward += r
         self._steps += 1
 
-        # Get next state
         done = self.env.all_done()
         next_obs = self.env.get_state()
 
-        # Q-update
         self.agent.q_update(
             r,
             next_obs.node_features,
@@ -116,14 +119,9 @@ class FuzzyTrainer(BaseTrainer):
             done,
         )
 
-        # Advance cached state
         self._observation = next_obs
 
     def update(self) -> float:
-        """
-        Called at episode end. Decays epsilon, updates reward EMA.
-        Returns total episode reward (used as the scalar metric like loss).
-        """
         self.agent.decay_epsilon()
         self._episode += 1
 
@@ -161,39 +159,54 @@ class FuzzyTrainer(BaseTrainer):
                 self.step()
             reward = self.update()
             current_episode = self._episode
+
             if progress_callback is not None:
+                # Add this episode's distribution to the rolling window
                 total_actions = sum(self._action_counts.values())
-                if total_actions == 0:
-                    action_distribution: dict[str, float] = {
-                        "nearest": 0.0,
-                        "second": 0.0,
-                        "third": 0.0,
-                        "depot": 0.0,
-                    }
-                else:
-                    action_distribution = {
+                if total_actions > 0:
+                    episode_dist = {
                         name: count / total_actions
                         for name, count in self._action_counts.items()
                     }
+                else:
+                    episode_dist = {k: 0.0 for k in self._fresh_action_counts()}
+                self._action_dist_window.append(episode_dist)
+                if len(self._action_dist_window) > self._action_dist_window_size:
+                    self._action_dist_window.pop(0)
+
+                # Report the average over the window — stable across frames
+                keys = list(self._fresh_action_counts().keys())
+                smoothed_dist = {
+                    k: sum(d[k] for d in self._action_dist_window) / len(self._action_dist_window)
+                    for k in keys
+                }
 
                 progress_callback(
                     {
                         "episode": current_episode,
                         "epsilon": self.agent.epsilon,
                         "q_table_size": len(self.agent.q_table),
-                        "action_distribution": action_distribution,
+                        "action_distribution": smoothed_dist,
                     }
                 )
 
             elapsed = time.time() - t0
 
             if current_episode % 500 == 0:
+                # Use cumulative totals for the periodic print so the
+                # percentages are stable and representative.
+                grand_total = sum(self._action_counts_total.values()) or 1
+                dist_str = "  ".join(
+                    f"{k}={v / grand_total:.1%}"
+                    for k, v in self._action_counts_total.items()
+                )
                 print(
                     f"Episode {current_episode:6d} | "
                     f"reward={reward:.3f} | "
                     f"ema={self._reward_ema:.3f} | "
                     f"epsilon={self.agent.epsilon:.3f} | "
                     f"q_states={len(self.agent.q_table)} | "
+                    f"{dist_str} | "
                     f"{elapsed:.3f}s"
                 )
 
@@ -207,7 +220,6 @@ class FuzzyTrainer(BaseTrainer):
     def save(self, path: str | None = None) -> None:
         p = Path(path) if path else self._checkpoint_path_for_episode(self._episode)
         self.agent.save(str(p))
-        # Save trainer metadata alongside agent in a companion file
         torch.save(
             {"episode": self._episode, "reward_ema": self._reward_ema}, str(p) + ".meta"
         )
@@ -232,7 +244,7 @@ class FuzzyTrainer(BaseTrainer):
         device = kwargs.get("device")
 
         if device is None:
-            device = torch.device("cpu")  # fuzzy agent is CPU-only
+            device = torch.device("cpu")
         else:
             assert isinstance(device, torch.device)
 

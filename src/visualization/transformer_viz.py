@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+import config
 
 from ..agent.base import AgentObservation
 from ..agent.transformer.agent import TransformerAgent
@@ -34,7 +35,7 @@ class TransformerVisualization(BaseVisualization):
         num_nodes: int,
         **kwargs: object,
     ) -> "TransformerVisualization":
-        d_model_obj = kwargs.get("d_model", 128)
+        d_model_obj = kwargs.get("d_model", config.TRANSFORMER_D_MODEL)
         speed_obj = kwargs.get("speed", 0.05)
         seed_obj = kwargs.get("seed", 42)
 
@@ -52,7 +53,11 @@ class TransformerVisualization(BaseVisualization):
             assert isinstance(device, torch.device)
 
         agent = TransformerAgent(
-            node_features=4, state_features=3, d_model=d_model, device=device
+            node_features=config.TRANSFORMER_NODE_FEATURES,
+            state_features=config.TRANSFORMER_STATE_FEATURES,
+            d_model=d_model,
+            device=device,
+            optimizer_lr=config.TRANSFORMER_LR,
         )
         ckpt = torch.load(checkpoint_path, map_location=device)
         agent.encoder.load_state_dict(ckpt["encoder"])

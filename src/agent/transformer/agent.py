@@ -18,14 +18,24 @@ class TransformerAgent(BaseAgent):
 		state_features: int,
 		d_model: int,
 		device: torch.device,
+		optimizer_lr: float = 1e-4,
 	):
 		super().__init__()
+		print(
+			"[transformer agent] init "
+			f"node_features={node_features}, "
+			f"state_features={state_features}, "
+			f"d_model={d_model}, "
+			f"optimizer_lr={optimizer_lr}, "
+			f"device={device}"
+		)
 		self.device = device
+		self.optimizer_lr = optimizer_lr
 		self.encoder = Encoder(node_features, d_model).to(device)
 		self.decoder = Decoder(state_features, d_model).to(device)
 		self.optimizer = torch.optim.Adam(
 			itertools.chain(self.encoder.parameters(), self.decoder.parameters()),
-			lr=1e-4,
+			lr=optimizer_lr,
 		)
 		self._log_probs: list[torch.Tensor] = []
 		self._rewards: list[float] = []
@@ -63,6 +73,7 @@ class TransformerAgent(BaseAgent):
 				"node_features": self.encoder.input_proj.in_features,
 				"state_features": self.decoder.query_proj.in_features,
 				"d_model": self.encoder.input_proj.out_features,
+				"optimizer_lr": self.optimizer_lr,
 				"encoder": self.encoder.state_dict(),
 				"decoder": self.decoder.state_dict(),
 				"optimizer": self.optimizer.state_dict(),
@@ -78,6 +89,7 @@ class TransformerAgent(BaseAgent):
 			state_features=ckpt.get("state_features", 3),
 			d_model=ckpt.get("d_model", 128),
 			device=device,
+			optimizer_lr=float(ckpt.get("optimizer_lr", 1e-4)),
 		)
 		agent.encoder.load_state_dict(ckpt["encoder"])
 		agent.decoder.load_state_dict(ckpt["decoder"])

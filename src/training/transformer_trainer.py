@@ -287,7 +287,11 @@ class TransformerTrainer(BaseTrainer):
             assert isinstance(device, torch.device)
 
         agent = TransformerAgent(
-            node_features=4, state_features=3, d_model=d_model, device=device
+            node_features=config.TRANSFORMER_NODE_FEATURES,
+            state_features=config.TRANSFORMER_STATE_FEATURES,
+            d_model=d_model,
+            device=device,
+            optimizer_lr=config.TRANSFORMER_LR,
         )
         env = BatchVRPEnv(
             batch_size=batch_size,

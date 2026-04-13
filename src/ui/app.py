@@ -178,6 +178,7 @@ class SimulationApp:
                 viz = TransformerVisualization.load_agent(
                     str(latest_checkpoint),
                     num_nodes=self.num_nodes,
+                    d_model=config.TRANSFORMER_D_MODEL,
                     speed=self.cfg.default_speed,
                     device=device,
                     seed=self.cfg.seed,
@@ -185,10 +186,11 @@ class SimulationApp:
                 print(f"[main] loaded checkpoint from {latest_checkpoint}")
             else:
                 agent = TransformerAgent(
-                    node_features=4,
-                    state_features=3,
-                    d_model=128,
+                    node_features=config.TRANSFORMER_NODE_FEATURES,
+                    state_features=config.TRANSFORMER_STATE_FEATURES,
+                    d_model=config.TRANSFORMER_D_MODEL,
                     device=device,
+                    optimizer_lr=config.TRANSFORMER_LR,
                 )
                 viz = TransformerVisualization(
                     agent=agent,
@@ -210,7 +212,13 @@ class SimulationApp:
                 )
                 print(f"[main] loaded fuzzy checkpoint from {latest_checkpoint}")
             else:
-                fuzzy_agent = FuzzyAgent()
+                fuzzy_agent = FuzzyAgent(
+                    epsilon=config.FUZZY_EPSILON,
+                    epsilon_min=config.FUZZY_EPSILON_MIN,
+                    epsilon_decay=config.FUZZY_EPSILON_DECAY,
+                    lr=config.FUZZY_LR,
+                    gamma=config.FUZZY_GAMMA,
+                )
                 viz = FuzzyVisualization(
                     agent=fuzzy_agent,
                     num_nodes=self.num_nodes,
@@ -323,7 +331,7 @@ def _run_trainer_worker(
         if resume_checkpoint is not None:
             trainer = TransformerTrainer.load(
                 str(resume_checkpoint),
-                d_model=128,
+                d_model=config.TRANSFORMER_D_MODEL,
                 batch_size=batch_size,
                 num_nodes=num_nodes,
                 save_path=str(checkpoint),
@@ -333,10 +341,11 @@ def _run_trainer_worker(
             print(f"[trainer] resumed from episode {trainer.episode}")
         else:
             agent = TransformerAgent(
-                node_features=4,
-                state_features=3,
-                d_model=128,
+                node_features=config.TRANSFORMER_NODE_FEATURES,
+                state_features=config.TRANSFORMER_STATE_FEATURES,
+                d_model=config.TRANSFORMER_D_MODEL,
                 device=device,
+                optimizer_lr=config.TRANSFORMER_LR,
             )
             env = BatchVRPEnv(
                 batch_size=batch_size,
@@ -365,7 +374,13 @@ def _run_trainer_worker(
             )
             print(f"[fuzzy trainer] resumed from episode {trainer.episode}")
         else:
-            fuzzy_agent = FuzzyAgent()
+            fuzzy_agent = FuzzyAgent(
+                epsilon=config.FUZZY_EPSILON,
+                epsilon_min=config.FUZZY_EPSILON_MIN,
+                epsilon_decay=config.FUZZY_EPSILON_DECAY,
+                lr=config.FUZZY_LR,
+                gamma=config.FUZZY_GAMMA,
+            )
             env = BatchVRPEnv(
                 batch_size=1,
                 num_nodes=num_nodes,
