@@ -224,6 +224,7 @@ class HUD:
         lines = [
             ("Round", str(stats.round)),
             ("Orphans", f"{stats.orphans} / {stats.total_nodes}"),
+            ("Rotation", str(simulation_snapshot.environment.truck.heading_deg)),
             ("Distance", f"{stats.total_distance:.1f}"),
             ("Exact cost", exact_label),
             (

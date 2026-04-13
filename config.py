@@ -2,7 +2,7 @@ from typing import Literal
 
 # VRP Instance Generation Config:
 NUM_NODES = 12                                                      # Number of customer nodes (excluding depot)     
-ENV_DEPOT_MODE: Literal["center", "random"] = "random"              # "center" places depot at (0.5, 0.5), "random" samples depot like other nodes
+ENV_DEPOT_MODE: Literal["center", "random"] = "center"              # "center" places depot at (0.5, 0.5), "random" samples depot like other nodes
 ENV_NODE_XY_RANGE = (0.0, 1.0)                                      # Range for x and y coordinates of nodes
 ENV_DEMAND_RANGE = (1, 1)                                           # Range for customer demand (inclusive)
 ENV_CAPACITY_RANGE = (3, 7)                                         # Range for truck capacity (inclusive)
@@ -28,6 +28,6 @@ FONT_SIZE = 25                                                      # Font size 
 FONT_SIZE_SMALL = int(FONT_SIZE * 0.75)                             # Font size for secondary text
 POLL_INTERVAL_S = 2.0                                               # Seconds between automatic simulation resets
 DEFAULT_SPEED = 0.01                                                # Default simulation speed        
-SPEED_STEP = 0.01                                                   # Amount to increase/decrease speed when adjusting
+SPEED_STEP = 0.005                                                   # Amount to increase/decrease speed when adjusting
 SPEED_MIN = 0.0001                                                # Minimum simulation speed 
 SPEED_MAX = 1.0                                                     # Maximum simulation speed 

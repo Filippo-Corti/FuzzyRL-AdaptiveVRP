@@ -38,25 +38,7 @@ class Sprites:
         if fill_w > 0:
             pygame.draw.rect(truck_surface, color, (bx, by, fill_w, bar_h))
 
-        # If broken, draw an X over the bar area; this also rotates with the truck.
-        if broken:
-            pygame.draw.line(
-                truck_surface,
-                colors.TRUCK_BROKEN,
-                (bx, by),
-                (bx + bar_w, by + bar_h),
-                3,
-            )
-            pygame.draw.line(
-                truck_surface,
-                colors.TRUCK_BROKEN,
-                (bx + bar_w, by),
-                (bx, by + bar_h),
-                3,
-            )
-
-        # Sprite default orientation is left-facing, so apply a 180deg offset.
-        rotated_sprite = pygame.transform.rotate(truck_surface, heading_deg + 180.0)
+        rotated_sprite = pygame.transform.rotate(truck_surface, 180 - heading_deg)
         rect = rotated_sprite.get_rect(center=(x, y))
         surface.blit(rotated_sprite, rect)
 

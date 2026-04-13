@@ -52,7 +52,7 @@ class VRPRenderer:
             sx, sy = self._to_screen(*node.pos)
             Sprites.draw_node(self.surface, pygame.Vector2(sx, sy), color)
             label = self._font_small.render(
-                f"({node.pos[0]}, {node.pos[1]}) - {node.demand}", True, (140, 140, 160)
+                f"({node.pos[0]:.2f}, {node.pos[1]:.2f}) - {node.demand}", True, (140, 140, 160)
             )
 
             self.surface.blit(label, (sx - label.get_rect().centerx, sy + 8))
