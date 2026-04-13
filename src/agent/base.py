@@ -51,9 +51,11 @@ class BaseAgent(ABC):
 
     def eval(self) -> None:
         """Optional hook for agents with train/eval mode."""
+        pass
 
     def train(self) -> None:
         """Optional hook for agents with train/eval mode."""
+        pass
 
     @abstractmethod
     def save(self, path: str) -> None:

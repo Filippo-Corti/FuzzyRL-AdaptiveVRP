@@ -1,19 +1,20 @@
-import pygame
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from typing import Literal
 
+import pygame
+
 import config
-from ..visualization import snapshot
-from . import colors
+from ...visualization import snapshot
+from .. import colors
 
 
 HUDAction = Literal["toggle_pause", "step_once", "speed_up", "speed_down"]
 
 
-class LegacyHUD:
-    """
-    Renders the right-side information panel.
-    Receives agent_info dict rather than the agent directly.
-    """
+class BaseHUD(ABC):
+    """Abstract HUD with shared controls, instance stats and plotting utilities."""
 
     PANEL_W = 260
     BAR_H = config.FONT_SIZE_SMALL
@@ -29,8 +30,8 @@ class LegacyHUD:
             "monospace", config.FONT_SIZE_SMALL
         )
         self._buttons: dict[HUDAction, pygame.Rect] = self._build_buttons()
-        self._training_baseline: float | None = None
-        self._baseline_points: list[tuple[int, float]] = []
+
+        self._training_stats: dict[str, object] = {}
         self._last_stats_episode: int = -1
 
         self._gap_ema: float | None = None
@@ -41,19 +42,32 @@ class LegacyHUD:
         self._prev_total_distance: float | None = None
         self._prev_exact_cost: float | None = None
 
-    def set_training_stats(
-        self,
-        episode: int,
-        baseline: float | None,
-        adv_ema: float | None,
-    ) -> None:
-        if episode >= 0 and episode > self._last_stats_episode:
-            if baseline is not None:
-                self._baseline_points.append((episode, baseline))
+    def set_training_stats(self, stats: dict[str, object]) -> None:
+        self._training_stats = stats
+        episode = self._get_stat_int("episode")
+        if episode is not None and episode > self._last_stats_episode:
+            self._on_new_training_stats(episode, stats)
             self._last_stats_episode = episode
 
-        self._training_baseline = baseline
-        _ = adv_ema
+    def _on_new_training_stats(self, episode: int, stats: dict[str, object]) -> None:
+        _ = episode
+        _ = stats
+
+    def _get_stat_int(self, key: str) -> int | None:
+        value = self._training_stats.get(key)
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        return None
+
+    def _get_stat_float(self, key: str) -> float | None:
+        value = self._training_stats.get(key)
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
 
     def _build_buttons(self) -> dict[HUDAction, pygame.Rect]:
         x = self.rect.left + 12
@@ -89,17 +103,13 @@ class LegacyHUD:
         paused: bool,
         speed: float,
         checkpoint_episode: float,
-        training_episode: int,
-    ):
-        """
-        Draw the HUD and control buttons.
-        """
+    ) -> None:
         self._update_gap_ema_series(simulation_snapshot)
         self.draw_background()
 
         top_rect, mid_rect, bottom_rect = self._section_rects()
         self.draw_instance_stats_section(simulation_snapshot, top_rect)
-        self.draw_training_stats_section(training_episode, mid_rect)
+        self.draw_training_stats_section(mid_rect)
         self.draw_controls_section(paused, speed, checkpoint_episode, bottom_rect)
 
     def _update_gap_ema_series(
@@ -167,46 +177,18 @@ class LegacyHUD:
         y = self.draw_section_header("Instance stats", section_rect.top)
         self.draw_stats(simulation_snapshot, y)
 
-    def draw_training_stats_section(
-        self,
-        training_episode: int,
-        section_rect: pygame.Rect,
-    ) -> None:
-        y = self.draw_section_header("Training stats", section_rect.top)
-        training_label = "-" if training_episode < 0 else str(training_episode)
-        self._draw_kv("Episode", training_label, section_rect.left, y)
-        y += 22
+    @abstractmethod
+    def draw_training_stats_section(self, section_rect: pygame.Rect) -> None:
+        """Render mode-specific training stats."""
 
-        baseline_rect = pygame.Rect(section_rect.left + 6, y, section_rect.width - 12, 226)
-        self.draw_line_plot(
-            rect=baseline_rect,
-            points=list(self._baseline_points),
-            color=(102, 214, 177),
-            label="Baseline",
-            latest=self._training_baseline,
-            x_axis_label="episodes",
-            y_axis_label="baseline",
-        )
-
-        adv_rect = pygame.Rect(section_rect.left + 6, baseline_rect.bottom + 10, section_rect.width - 12, 226)
-        self.draw_line_plot(
-            rect=adv_rect,
-            points=list(self._gap_ema_points),
-            color=(245, 186, 74),
-            label="Gap EMA",
-            latest=self._gap_ema,
-            x_axis_label="viz episodes",
-            y_axis_label="rel gap",
-        )
-
-    def draw_background(self):
+    def draw_background(self) -> None:
         panel_surf = pygame.Surface(
             (self.rect.width, self.rect.height), pygame.SRCALPHA
         )
         panel_surf.fill(colors.HUD_BG)
         self.surface.blit(panel_surf, self.rect.topleft)
 
-    def draw_section_header(self, text: str, y: float):
+    def draw_section_header(self, text: str, y: float) -> float:
         label = self._font.render(text, True, (180, 180, 200))
         self.surface.blit(label, (self.rect.left + 10, y))
         pygame.draw.line(
@@ -218,7 +200,7 @@ class LegacyHUD:
         )
         return y + config.FONT_SIZE + 5
 
-    def draw_stats(self, simulation_snapshot: snapshot.SimulationSnapshot, y: float):
+    def draw_stats(self, simulation_snapshot: snapshot.SimulationSnapshot, y: float) -> float:
         stats = simulation_snapshot.stats
         exact_label = "-" if stats.exact_cost is None else f"{stats.exact_cost:.2f}"
         lines = [
@@ -237,7 +219,7 @@ class LegacyHUD:
             y += 18
         return y
 
-    def _draw_kv(self, key: str, value: str, x: float, y: float):
+    def _draw_kv(self, key: str, value: str, x: float, y: float) -> None:
         k_surf = self._font_small.render(key + ":", True, (140, 140, 160))
         v_surf = self._font_small.render(value, True, colors.HUD_TEXT)
         self.surface.blit(k_surf, (x + 10, y))
@@ -312,7 +294,14 @@ class LegacyHUD:
             + x_label_gap
             + x_label_surf.get_height()
         )
-        plot_left = rect.left + plot_pad_x + y_label_vertical.get_width() + y_label_gap + y_tick_w + y_tick_gap
+        plot_left = (
+            rect.left
+            + plot_pad_x
+            + y_label_vertical.get_width()
+            + y_label_gap
+            + y_tick_w
+            + y_tick_gap
+        )
         plot_right = rect.right - plot_pad_x
         plot_w = plot_right - plot_left
         plot_h = plot_bottom - plot_top
@@ -324,7 +313,11 @@ class LegacyHUD:
             x_label_surf,
             (
                 plot_left + max(0, (plot_w - x_label_surf.get_width()) // 2),
-                plot_bottom + x_tick_len + x_tick_gap + self._font_small.get_height() + x_label_gap,
+                plot_bottom
+                + x_tick_len
+                + x_tick_gap
+                + self._font_small.get_height()
+                + x_label_gap,
             ),
         )
         self.surface.blit(
@@ -336,8 +329,20 @@ class LegacyHUD:
         )
 
         axis_color = (92, 98, 118)
-        pygame.draw.line(self.surface, axis_color, (plot_left, plot_top), (plot_left, plot_bottom), 1)
-        pygame.draw.line(self.surface, axis_color, (plot_left, plot_bottom), (plot_right, plot_bottom), 1)
+        pygame.draw.line(
+            self.surface,
+            axis_color,
+            (plot_left, plot_top),
+            (plot_left, plot_bottom),
+            1,
+        )
+        pygame.draw.line(
+            self.surface,
+            axis_color,
+            (plot_left, plot_bottom),
+            (plot_right, plot_bottom),
+            1,
+        )
 
         for i in range(x_tick_count):
             f = i / (x_tick_count - 1)
@@ -426,6 +431,12 @@ class LegacyHUD:
 
         for action, rect in self._buttons.items():
             pygame.draw.rect(self.surface, (225, 228, 236), rect, border_radius=8)
-            pygame.draw.rect(self.surface, (160, 166, 180), rect, width=1, border_radius=8)
+            pygame.draw.rect(
+                self.surface,
+                (160, 166, 180),
+                rect,
+                width=1,
+                border_radius=8,
+            )
             label = self._font_small.render(labels[action], True, (55, 60, 72))
             self.surface.blit(label, label.get_rect(center=rect.center))

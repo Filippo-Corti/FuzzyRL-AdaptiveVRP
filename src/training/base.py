@@ -44,7 +44,7 @@ class BaseTrainer(ABC):
     def train(
         self,
         num_episodes: int,
-        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+        progress_callback: Callable[[dict[str, object]], None] | None = None,
     ) -> None:
         """Run the full training loop."""
         pass

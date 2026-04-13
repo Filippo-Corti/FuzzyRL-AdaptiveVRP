@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Callable, Literal, cast
 
 import config
-from ..agent.base import AgentObservation as PolicyObservation
+from ..agent.base import AgentObservation
 from ..agent.fuzzy.agent import FuzzyAgent
-from ..env.batch_env import AgentObservation, BatchVRPEnv
+from ..env.batch_env import BatchVRPEnv
 from .base import BaseTrainer
 
 
@@ -46,6 +46,12 @@ class FuzzyTrainer(BaseTrainer):
         # Running average reward for logging
         self._reward_ema: float | None = None
         self._ema_alpha: float = 0.05
+        self._action_counts: dict[str, int] = {
+            "nearest": 0,
+            "second": 0,
+            "third": 0,
+            "depot": 0,
+        }
 
     @property
     def episode(self) -> int:
@@ -68,18 +74,28 @@ class FuzzyTrainer(BaseTrainer):
         self._observation = self.env.get_state()
 
     def step(self) -> None:
+        assert self._observation is not None
         observation = self._observation
-        assert observation is not None
 
         # Agent selects action (stores last state/action internally)
         decision = self.agent.select_action(
-            PolicyObservation(
+            AgentObservation(
                 node_features=observation.node_features,
                 truck_state=observation.truck_state,
                 mask=observation.mask,
             ),
             greedy=False,
         )
+
+        chosen = self.agent.last_fuzzy_action
+        if chosen == 0:
+            self._action_counts["nearest"] += 1
+        elif chosen == 1:
+            self._action_counts["second"] += 1
+        elif chosen == 2:
+            self._action_counts["third"] += 1
+        elif chosen == 3:
+            self._action_counts["depot"] += 1
 
         # Step env
         reward = self.env.step(decision.actions)
@@ -127,7 +143,7 @@ class FuzzyTrainer(BaseTrainer):
     def train(
         self,
         num_episodes: int,
-        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+        progress_callback: Callable[[dict[str, object]], None] | None = None,
     ) -> None:
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
         print(
@@ -146,7 +162,28 @@ class FuzzyTrainer(BaseTrainer):
             reward = self.update()
             current_episode = self._episode
             if progress_callback is not None:
-                progress_callback({"episode": current_episode})
+                total_actions = sum(self._action_counts.values())
+                if total_actions == 0:
+                    action_distribution: dict[str, float] = {
+                        "nearest": 0.0,
+                        "second": 0.0,
+                        "third": 0.0,
+                        "depot": 0.0,
+                    }
+                else:
+                    action_distribution = {
+                        name: count / total_actions
+                        for name, count in self._action_counts.items()
+                    }
+
+                progress_callback(
+                    {
+                        "episode": current_episode,
+                        "epsilon": self.agent.epsilon,
+                        "q_table_size": len(self.agent.q_table),
+                        "action_distribution": action_distribution,
+                    }
+                )
 
             elapsed = time.time() - t0
 

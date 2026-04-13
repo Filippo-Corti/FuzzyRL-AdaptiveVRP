@@ -8,14 +8,14 @@ ENV_DEMAND_RANGE = (1, 1)                                           # Range for 
 ENV_CAPACITY_RANGE = (3, 7)                                         # Range for truck capacity (inclusive)
 
 # Agent Configuration
-AGENT_MODE = "transformer"                                          # "transformer" or "fuzzy"
+AGENT_MODE = "fuzzy"                                                # "transformer" or "fuzzy"
 CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"          # Path to trained transformer agent checkpoint
 CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"                     # Path to trained fuzzy agent checkpoint (pickle file)
 SEED = None                                                         # Set to an int for visualizing the same instance
 
 # Trainer runtime execution settings
-TRAINER_BATCH_SIZE = 128                                             # Number of VRP instances to train on in parallel
-TRAINER_SAVE_EVERY = 100                                             # Save a checkpoint every N episodes
+TRAINER_BATCH_SIZE = 128                                             # Number of VRP instances to train on in parallel (transformer only)
+TRAINER_SAVE_EVERY = 1000                                            # Save a checkpoint every N episodes
 TRAINER_TORCH_THREADS = 1                                            # Number of CPU threads for PyTorch to use during training   
 
 # Visualization Config:
@@ -28,6 +28,6 @@ FONT_SIZE = 25                                                      # Font size 
 FONT_SIZE_SMALL = int(FONT_SIZE * 0.75)                             # Font size for secondary text
 POLL_INTERVAL_S = 2.0                                               # Seconds between automatic simulation resets
 DEFAULT_SPEED = 0.01                                                # Default simulation speed        
-SPEED_STEP = 0.005                                                   # Amount to increase/decrease speed when adjusting
-SPEED_MIN = 0.0001                                                # Minimum simulation speed 
+SPEED_STEP = 0.005                                                  # Amount to increase/decrease speed when adjusting
+SPEED_MIN = 0.0001                                                  # Minimum simulation speed 
 SPEED_MAX = 1.0                                                     # Maximum simulation speed 

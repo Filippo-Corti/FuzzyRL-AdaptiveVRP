@@ -169,6 +169,10 @@ class FuzzyAgent(BaseAgent):
 	def decay_epsilon(self):
 		self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
+	@property
+	def last_fuzzy_action(self) -> int | None:
+		return self._last_action
+
 	def save(self, path: str) -> None:
 		Path(path).parent.mkdir(parents=True, exist_ok=True)
 		with open(path, "wb") as f:

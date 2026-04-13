@@ -2,6 +2,8 @@ import torch
 from dataclasses import dataclass
 from typing import Literal
 
+from ..agent.base import AgentObservation
+
 
 @dataclass
 class BatchInstanceData:
@@ -21,20 +23,6 @@ class BatchSolutionData:
     remaining_cap: torch.Tensor  # (B,)
     truck_xy: torch.Tensor  # (B, 2)
     at_depot: torch.Tensor  # (B,) bool
-
-
-@dataclass
-class AgentObservation:
-    """Semantic wrapper around agent-facing observation tensors."""
-
-    node_features: torch.Tensor  # (B, N+1, 4)
-    truck_state: torch.Tensor  # (B, 3)
-    mask: torch.Tensor  # (B, N+1) bool
-
-    def __iter__(self):
-        yield self.node_features
-        yield self.truck_state
-        yield self.mask
 
 
 @dataclass

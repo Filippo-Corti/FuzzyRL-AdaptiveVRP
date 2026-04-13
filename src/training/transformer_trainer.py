@@ -47,6 +47,8 @@ class TransformerTrainer(BaseTrainer):
         self._baseline_ema_alpha: float = 0.05
         self._adv_ema: float | None = None
         self._adv_ema_alpha: float = 0.05
+        self._relative_gap_ema: float | None = None
+        self._relative_gap_ema_alpha: float = 0.05
 
     def _assert_episode_ready(self) -> tuple[torch.Tensor, torch.Tensor]:
         assert self._sampled_rewards is not None
@@ -159,6 +161,15 @@ class TransformerTrainer(BaseTrainer):
             self._adv_ema = (
                 1 - self._adv_ema_alpha
             ) * self._adv_ema + self._adv_ema_alpha * adv_mean
+
+        denom = max(abs(baseline_mean), 1e-9)
+        relative_gap = (sampled_rewards.mean().item() - baseline_mean) / denom
+        if self._relative_gap_ema is None:
+            self._relative_gap_ema = relative_gap
+        else:
+            self._relative_gap_ema = (
+                1 - self._relative_gap_ema_alpha
+            ) * self._relative_gap_ema + self._relative_gap_ema_alpha * relative_gap
         return loss.item()
 
     def is_done(self) -> bool:
@@ -172,7 +183,7 @@ class TransformerTrainer(BaseTrainer):
     def train(
         self,
         num_episodes: int,
-        progress_callback: Callable[[dict[str, int | float | None]], None] | None = None,
+        progress_callback: Callable[[dict[str, object]], None] | None = None,
     ) -> None:
         """
         Run the full training loop for num_episodes episodes.
@@ -199,7 +210,7 @@ class TransformerTrainer(BaseTrainer):
                     {
                         "episode": current_episode,
                         "baseline": self._baseline_ema,
-                        "adv_ema": self._adv_ema,
+                        "relative_gap": self._relative_gap_ema,
                     }
                 )
 

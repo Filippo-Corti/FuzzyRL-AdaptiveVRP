@@ -17,7 +17,7 @@ from src.env.batch_env import BatchVRPEnv
 from src.training import FuzzyTrainer, TransformerTrainer
 from src.visualization import FuzzyVisualization, TransformerVisualization
 from src.visualization.base import BaseVisualization
-from src.ui.hud import HUD
+from src.ui.hud import create_hud
 from src.ui.renderer import VRPRenderer
 from src.ui.sprites import Sprites
 
@@ -56,8 +56,7 @@ class SimulationApp:
         self.last_poll_time: float = time.time()
         self.training_status_path = _training_status_path(self.checkpoint_path)
         self.training_episode: int = -1
-        self.training_baseline: float | None = None
-        self.training_adv_ema: float | None = None
+        self.training_stats: dict[str, object] = {}
         self._training_status_mtime: float = 0.0
 
         self.speed = self.cfg.default_speed
@@ -80,7 +79,7 @@ class SimulationApp:
         graph_rect = pygame.Rect(0, 0, config.GRAPH_W, config.WINDOW_H)
         hud_rect = pygame.Rect(config.GRAPH_W, 0, config.HUD_W, config.WINDOW_H)
         renderer = VRPRenderer(screen, graph_rect)
-        hud = HUD(screen, hud_rect)
+        hud = create_hud(self.cfg.agent_mode, screen, hud_rect)
 
         while True:
             clock.tick(config.FPS_CAP)
@@ -123,17 +122,12 @@ class SimulationApp:
             screen.fill((0, 0, 0))
             snapshot = self.viz.current_snapshot()
             renderer.draw(snapshot)
-            hud.set_training_stats(
-                self.training_episode,
-                self.training_baseline,
-                self.training_adv_ema,
-            )
+            hud.set_training_stats(self.training_stats)
             hud.draw(
                 snapshot,
                 self.paused,
                 self.speed,
                 self.checkpoint_episode,
-                self.training_episode,
             )
             pygame.display.flip()
 
@@ -141,8 +135,7 @@ class SimulationApp:
         """Start the training loop in a separate process."""
         # Reset in-memory status and remove stale status file from previous runs.
         self.training_episode = -1
-        self.training_baseline = None
-        self.training_adv_ema = None
+        self.training_stats = {}
         self._training_status_mtime = 0.0
         try:
             if self.training_status_path.exists():
@@ -276,17 +269,7 @@ class SimulationApp:
         if isinstance(ep_obj, int):
             self.training_episode = ep_obj
 
-        baseline_obj = data.get("baseline")
-        if isinstance(baseline_obj, (int, float)):
-            self.training_baseline = float(baseline_obj)
-        else:
-            self.training_baseline = None
-
-        adv_ema_obj = data.get("adv_ema")
-        if isinstance(adv_ema_obj, (int, float)):
-            self.training_adv_ema = float(adv_ema_obj)
-        else:
-            self.training_adv_ema = None
+        self.training_stats = data
 
     def _handle_reload_if_needed(self, viz: BaseVisualization) -> None:
         if not self.pending_reload:
@@ -329,7 +312,7 @@ def _run_trainer_worker(
     checkpoint = Path(checkpoint_path)
     status_path = _training_status_path(checkpoint)
 
-    def _emit_progress(metrics: dict[str, int | float | None]) -> None:
+    def _emit_progress(metrics: dict[str, object]) -> None:
         _write_training_status(status_path, metrics)
 
     resume_checkpoint, _ = _find_latest_checkpoint(checkpoint)
@@ -441,14 +424,10 @@ def _training_status_path(base_checkpoint: Path) -> Path:
 
 def _write_training_status(
     path: Path,
-    metrics: dict[str, int | float | None],
+    metrics: dict[str, object],
 ) -> None:
-    payload = {
-        "episode": metrics.get("episode"),
-        "baseline": metrics.get("baseline"),
-        "adv_ema": metrics.get("adv_ema"),
-        "updated_at": time.time(),
-    }
+    payload = dict(metrics)
+    payload["updated_at"] = time.time()
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload), encoding="utf-8")
 
