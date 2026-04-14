@@ -8,7 +8,7 @@ ENV_DEMAND_RANGE = (1, 3)                                           # Range for 
 ENV_CAPACITY_RANGE = (5, 9)                                         # Range for truck capacity (inclusive)
 
 # Agent Configuration
-AGENT_MODE: Literal["transformer", "fuzzy"] = "fuzzy"         # "transformer" or "fuzzy"
+AGENT_MODE: Literal["transformer", "fuzzy"] = "transformer"         # "transformer" or "fuzzy"
 CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"          # Path to trained transformer agent checkpoint
 CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"                     # Path to trained fuzzy agent checkpoint (pickle file)
 SEED = None                                                         # Set to an int for visualizing the same instance
@@ -28,7 +28,7 @@ TRANSFORMER_LR = 1e-4                                               # Learning r
 
 # Trainer runtime execution settings
 TRAINER_BATCH_SIZE = 32                                              # Number of VRP instances to train on in parallel (transformer only)
-TRAINER_SAVE_EVERY = 1000                                             # Save a checkpoint every N episodes
+TRAINER_SAVE_EVERY = 25                                             # Save a checkpoint every N episodes
 TRAINER_TORCH_THREADS = 1                                            # Number of CPU threads for PyTorch to use during training   
 
 # Visualization Config:

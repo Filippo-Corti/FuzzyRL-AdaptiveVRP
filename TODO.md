@@ -16,8 +16,6 @@
 - I should change the relative quality to refer to a NN heuristic. More meaningful
 - I should change instances generation to be clustered, not uniform.
 
-
-
 ---
 
 Some other notes once again:

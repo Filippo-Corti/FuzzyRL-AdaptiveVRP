@@ -116,7 +116,7 @@ class BaseHUD(ABC):
         self,
         simulation_snapshot: snapshot.SimulationSnapshot,
     ) -> None:
-        """Track per-instance (distance - exact) and append its EMA on each reset."""
+        """Track per-instance relative gap against baseline cost and append EMA on each reset."""
         current_round = simulation_snapshot.stats.round
 
         if (
@@ -207,7 +207,7 @@ class BaseHUD(ABC):
             ("Round", str(stats.round)),
             ("Orphans", f"{stats.orphans} / {stats.total_nodes}"),
             ("Distance", f"{stats.total_distance:.1f}"),
-            ("Exact cost", exact_label),
+            ("NN cost", exact_label),
             (
                 "Truck load",
                 f"{simulation_snapshot.environment.truck.load:.1f} / {simulation_snapshot.environment.truck.capacity:.1f}",
