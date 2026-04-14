@@ -1,188 +1,206 @@
-# Fuzzy Reinforcement Learning for the Dynamic Vehicle Routing Problem with Stochastic Disruptions
+# VRP Experimental Framework: Fuzzy RL vs Transformer vs Heuristic
+## Project Report & Implementation Plan
 
-## Problem Setting
+---
 
-The project models a garbage collection scenario where a fleet of trucks must visit a set of nodes — representing
-houses — distributed across a graph. Each node must be visited exactly once. Each truck has a fixed maximum load
-capacity and
-starts from a central depot. The primary objective is to minimise total route distance across all trucks while
-guaranteeing full coverage of all nodes, with routes that are geometrically clean — minimal crossings between truck
-paths.
+## 1. Problem Statement
 
-The environment is made non-stationary by a stochastic disruption model: at every round, each active truck has a small
-probability of breaking down. When a truck breaks down, it leaves the active fleet and all nodes assigned to its route
-become orphaned — unassigned and unvisited. A broken truck recovers after a geometrically distributed number of rounds,
-at which point it re-enters the fleet with full capacity and no assigned nodes. This dynamic creates two distinct
-recovery challenges: absorbing orphaned nodes quickly after a breakdown, and rebalancing routes efficiently when a truck
-returns to the fleet.
+The objective is to compare three decision-making strategies for a single-vehicle routing problem under realistic,
+structured conditions. The central question is whether learned policies — one interpretable (Fuzzy RL), one
+black-box (Transformer) — can outperform a strong domain-informed heuristic, and what each gains and loses
+relative to the other.
 
-## Why This Is Interesting
+This is not a claim that one method is universally better. The Transformer is expected to achieve the best route
+cost asymptotically. The Fuzzy RL agent is expected to close most of that gap while remaining fully interpretable.
+The heuristic provides the honest baseline that neither learned method should be compared against a trivial policy.
 
-A static VRP is a combinatorial optimisation problem best addressed by classical heuristics or exact solvers. The
-stochastic disruption model transforms it into something fundamentally different: an online decision problem where the
-agent must reason under uncertainty at runtime, not just plan offline. The interesting behaviour emerges not from
-finding a good initial plan but from adapting to disruptions quickly and well — recovering coverage without
-unnecessarily degrading route quality, and exploiting returned capacity without dismantling routes that are already
-working.
+---
 
-The two disruption events — breakdown and recovery — require qualitatively different responses. A breakdown demands
-urgent coverage: orphaned nodes must be absorbed as fast as possible, prioritising proximity and insertion cost. A
-recovery demands geometric refinement: the returned truck represents unused capacity and an opportunity to rebalance
-load and reduce route crossings. A single monolithic policy struggles to express both behaviours cleanly. This motivates
-a dual-agent architecture where each agent specialises in one recovery mode.
+## 2. Environment Design
 
-## Why Fuzzy Reinforcement Learning
+### 2.1 Geometry
 
-Two properties of this domain motivate Fuzzy RL specifically over plain RL or a fixed heuristic policy.
+Customer locations are not uniformly distributed. Each episode generates:
 
-The most important signals — truck load, fleet availability, orphan pressure, proximity to orphans, route efficiency,
-insertion cost, removal gain — are inherently gradual. A truck at 85% capacity is not full but should start behaving
-differently than one at 40%. A fleet at 60% availability is not critically reduced but routes need some rebalancing.
-Hard thresholds handle this poorly; fuzzy membership functions handle it gracefully by allowing a state to partially
-activate multiple linguistic categories simultaneously.
+- 4–5 spatial clusters of varying density and radius
+- 1–2 isolated outlier customers placed outside cluster regions
+- Total: approximately 50 customers per episode
 
-The policy should also be interpretable. A fuzzy rule base produces readable rules like "IF orphan pressure is HIGH and
-nearest orphan is NEAR and insertion cost is LOW → insert" or "IF route imbalance is HIGH and removal gain is HIGH →
-remove and reinsert into recovered truck." This interpretability is valuable both for debugging during development and
-for explaining the agent's behaviour in a presentation or report.
+This geometric structure is essential. It rewards policies that reason about global routing structure — visiting a
+dense cluster in sequence rather than bouncing between distant nodes — and penalises purely myopic greedy strategies.
+Instances are randomly generated each episode using fixed structural parameters (cluster count, spread, outlier
+fraction), so no method can memorise a fixed instance.
 
-## Simulation Modes
+### 2.2 Capacity and Demand
 
-The simulation operates in three distinct modes that gate which agent is active and when learning occurs:
+- The single truck has a fixed maximum load capacity
+- Each customer has a variable demand drawn from a distribution (e.g. uniform over [1, 5])
+- When the truck's remaining capacity cannot serve the next selected customer, the truck must return to the depot,
+  reload to full capacity, and continue
+- Depot returns are part of the decision sequence — the agent must decide when returning is necessary, not just
+  which customer to serve next
 
-- **Idle mode** — the solution is fully assigned, geometrically stable, and no disruption has recently fired. No agent
-  acts. The simulation waits for the next disruption event. This produces the calm phases visible in the demo where
-  routes sit clean and resolved.
+### 2.3 Dynamic Arrivals
 
-- **Breakdown recovery mode** — triggered when a truck breaks down and its nodes become orphaned. The breakdown agent
-  runs, absorbing orphans and restoring coverage as fast as possible while maintaining geometric quality. This mode ends
-  when orphan pressure returns to zero and the solution stabilises.
+- Approximately 70% of customers are placed at episode start
+- The remaining 30% arrive dynamically during the episode at random times
+- Each newly arrived customer receives a time window that starts counting from the moment of their arrival
+- Urgency for customer i is defined as: `urgency_i = time_elapsed_since_arrival / window_length`
+- This is a soft constraint: serving a customer after their window expires incurs a lateness penalty rather than
+  making the route infeasible. No route is ever infeasible.
 
-- **Fleet rebalancing mode** — triggered when a broken truck recovers and re-enters the fleet with empty routes. The
-  rebalancing agent runs, redistributing load toward the recovered truck and improving route geometry. This mode ends
-  when load imbalance falls below a threshold and the solution stabilises.
+### 2.4 Distance Model
 
-In the ambiguous case where both orphans exist and a truck has just recovered, breakdown recovery takes priority since
-coverage is the harder constraint.
+The environment uses a fully connected cost matrix with pure Euclidean distances. All three agents observe and
+reason over the same clean distance information. There is no travel time noise or congestion model — the
+interesting challenge comes entirely from routing structure: clusters, variable demand, dynamic arrivals, and
+soft time windows. The visualisation renders straight lines between nodes, with urgency colouring and route
+traces providing the visual richness.
 
-## Dual-Agent Architecture
+### 2.5 Objective Function
 
-Two independent agents operate within the same hyper-heuristic framework, each with a focused objective and a tailored
-state representation.
-
-### Breakdown Recovery Agent
-
-Responsible for fast, clean orphan absorption after a disruption. Operates only in breakdown recovery mode.
-
-State signals:
-
-- Orphan pressure — fraction of nodes currently unassigned
-- Nearest orphan distance — normalised distance from this truck's route endpoint to the closest orphan
-- Nearest orphan relative distance — this truck's proximity to the nearest orphan relative to the fleet average,
-  capturing whether this truck is the natural absorber
-- Truck load — fraction of capacity consumed by current planned route
-- Fleet availability — fraction of trucks currently active
-- Insertion cost — the actual cheapest insertion cost for the best available orphan into this truck's route, normalised
-  by average edge distance
-
-Actions: Insert, Remove, 2-opt, Do Nothing
-
-Reward:
+Total episode cost is:
 
 ```
-R = -delta_truck_distance - λ · orphans - γ_low · crossings
+C = total_travel_distance + α · Σ max(0, lateness_i)
 ```
 
-Where λ = 1.0 and γ_low = 0.1, prioritising coverage speed over geometric perfection.
+Where `lateness_i` is the time by which customer i was served after their window expired, and α is the lateness
+penalty weight. α should be calibrated so that there is genuine tension between serving a nearby cluster and
+handling an urgent isolated customer. A practical calibration method: run TONN with pure distance-greedy vs
+pure urgency-greedy on 20 instances, set α to the value where TONN's combined heuristic clearly beats both extremes.
 
-### Fleet Rebalancing Agent
+---
 
-Responsible for load redistribution and route quality improvement after a truck returns. Operates only in fleet
-rebalancing mode.
+## 3. Methods
 
-State signals:
+### 3.1 Baseline: Time-Oriented Nearest Neighbour (TONN)
 
-- Route imbalance — standard deviation of load fractions across active trucks
-- Truck load — fraction of capacity consumed by current planned route
-- Route efficiency — actual route distance per node normalised by expected average
-- Fleet availability — fraction of trucks currently active
-- Removal gain — the actual distance saved by the best removal from this truck's route, normalised by average edge
-  distance
-
-Actions: Insert, Remove, 2-opt, Do Nothing
-
-Reward:
+TONN is a strong handcrafted heuristic. At each step it selects the next customer by scoring all unvisited
+reachable candidates:
 
 ```
-R = -delta_truck_distance - μ · imbalance - γ_high · crossings
+score(c) = w_d · normalised_distance(c) + w_u · urgency(c) + w_f · feasibility_penalty(c)
 ```
 
-Where μ = 1.0 and γ_high = 0.3, prioritising geometric quality and load balance since coverage is already guaranteed.
+Where feasibility_penalty is zero if the truck can serve c without violating capacity, and a large constant
+otherwise. TONN returns to the depot when no feasible customer exists.
 
-## Action Space
+TONN is not a trivial baseline. It handles urgency, distance, and capacity simultaneously. It is the reference
+point both learned methods must beat to be meaningful.
 
-All actions are defined at the level of a single truck. Both agents share the same action set:
+### 3.2 Fuzzy Reinforcement Learning Agent
 
-- **Do nothing** — the truck skips its turn. Crucial for enabling anticipatory behaviour and avoiding unnecessary route
-  disruption during stable phases.
-- **Insert** — the heuristic finds the position in this truck's current planned route where inserting the nearest
-  orphaned node adds the least additional distance.
-- **Remove** — the heuristic identifies the node in this truck's current planned route whose removal yields the greatest
-  reduction in route distance and drops it, making it an orphan.
-- **2-opt** — the heuristic finds the single best improving 2-opt swap across all pairs of edges in this truck's planned
-  route and applies it. If no improving swap exists the action has no effect.
+#### Architecture
 
-The agent never chooses which specific node to insert or remove. The heuristic determines that internally. The agent
-only decides which type of operation to invoke.
+The Fuzzy RL agent scores each candidate customer independently using a fuzzy inference system, then selects the
+highest-scoring candidate. The agent does not choose from a discrete action set — the selection is implicit in the
+scoring. This is the correct formulation for routing: the "action" is which customer to serve next, and the policy
+is expressed as a scoring function over candidates.
 
-## Learning Algorithm: Fuzzy Q(λ)
+#### Per-candidate features (inputs to fuzzy inference)
 
-Both agents use the same learning algorithm: Fuzzy Q-learning extended with eligibility traces. The Q-table is indexed
-by fuzzy state label combinations rather than crisp state values. Each crisp observation value is passed through
-triangular membership functions that produce a dictionary of label→membership pairs. A value like fleet availability of
-0.65 might activate Reduced at 0.7 and Full at 0.3 simultaneously. Both activated labels contribute to the Q-value
-lookup and update, weighted by their membership values.
+| Feature | Description |
+|---|---|
+| Path cost | Shortest-path cost from current truck position to candidate under actual edge weights, normalised by mean edge weight |
+| Urgency | `time_elapsed / window_length` for this candidate, in [0, 1] |
+| Demand ratio | Candidate demand divided by truck remaining capacity |
+| Cluster density | Number of unvisited customers within radius r of candidate, normalised |
+| Detour cost | Shortest-path cost via candidate vs direct path to depot, normalised by mean edge weight |
 
-Eligibility traces extend standard Q-learning by maintaining a trace value for every Q-table entry, decaying over time,
-and updating all entries proportionally to their trace at every step. This is particularly important for the
-remove-then-insert sequence: removing a node looks neutral or slightly negative immediately but pays off when the freed
-node is reinserted more cheaply elsewhere. Traces propagate credit back to the removal decision.
+Distance is replaced by shortest-path cost under actual weights, not Euclidean distance. This is the correct
+signal given the sparse graph structure: a geometrically close node may be expensive to reach if the connecting
+edges are congested. The cluster density signal is still critical — without it the fuzzy agent is blind to global
+structure and will plateau near greedy performance on clustered instances.
 
-Traces are reset at each mode transition — when a disruption fires or a truck recovers, past decisions become less
-relevant to current credit assignment.
+#### Fuzzy membership functions
 
-## Adaptive Membership Functions
+Each feature is mapped to linguistic labels via triangular membership functions:
+- Distance: {Near, Medium, Far}
+- Urgency: {Low, Moderate, High}
+- Demand ratio: {Light, Moderate, Heavy}
+- Cluster density: {Sparse, Moderate, Dense}
+- Detour cost: {Cheap, Moderate, Expensive}
 
-The breakpoints of each triangular membership function are stored as learnable parameters rather than fixed values.
-After each Q-update, the breakpoints are nudged slightly in the direction that would have increased the Q-value of the
-chosen action. This means each agent learns not just what to do in each fuzzy state, but also what the right way to
-perceive its specific state space is. The two agents may develop different membership function shapes, reflecting the
-different value distributions relevant to each recovery mode.
+Breakpoints are stored as learnable parameters and updated after each episode (see Section 5.2).
 
-## Shared Policy Across Trucks
+#### Rule base
 
-Within each agent, a single Q-table and a single set of membership function parameters are shared across all trucks. The
-agent is invoked once per truck per round, seeing the world through that truck's eyes. Every experience from every truck
-updates the same Q-table, so the agent learns from the full fleet's behaviour simultaneously. Trucks are assumed
-homogeneous — same capacity, same speed, same cost per unit distance.
+The rule base maps label combinations to a priority score. Example rules:
 
-## Greedy Baseline
+- IF Urgency=High AND Distance=Near → priority VERY_HIGH
+- IF ClusterDensity=Dense AND DetourCost=Cheap → priority HIGH
+- IF DemandRatio=Heavy AND Distance=Far → priority LOW
+- IF Urgency=Low AND ClusterDensity=Sparse → priority VERY_LOW
 
-A greedy policy serves as the comparison baseline. In breakdown recovery mode it always inserts the nearest orphan using
-cheapest insertion when orphans exist and applies 2-opt otherwise. In fleet rebalancing mode it removes the node with
-the highest removal gain from the most loaded truck and inserts it into the least loaded truck. It has no learning
-component and no fuzzy state representation.
+Rule weights are learnable parameters updated by the REINFORCE signal.
 
-## Evaluation Metrics
+#### Learning
 
-- **Recovery speed** — after each breakdown, count the number of rounds until orphan pressure returns to zero. Average
-  across many disruption events. Lower is better.
-- **Recovery quality** — after stabilisation following a breakdown, compute the total route distance of the recovered
-  solution. Compare against the greedy baseline's distance on the same post-disruption graph.
-- **Rebalancing quality** — after a truck returns, measure the reduction in route imbalance and crossing count achieved
-  before idle mode is re-entered. Compare against the greedy rebalancing baseline.
-- **Learning curves** — total reward per mode episode over training for each agent independently. Should trend upward
-  and stabilise.
-- **Ablation** — the same experiment run with crisp Q(λ) instead of fuzzy membership, isolating the contribution of the
-  fuzzy representation.
+REINFORCE with TONN advantage:
+
+```
+advantage = C_TONN(instance) - C_agent(instance)
+```
+
+Where both costs are computed on the same episode instance. The gradient updates both the rule weights and the
+membership function breakpoints. This advantage formulation is correct: it measures improvement over the
+heuristic on the same geometry, removing instance difficulty as a confound.
+
+### 3.3 Transformer Agent
+
+The Transformer follows the Kool et al. (2019) architecture with minor adaptations for this environment.
+
+#### Node features (encoder input)
+
+Each customer node is represented as a vector:
+- x, y coordinates (normalised)
+- Demand (normalised by truck capacity)
+- Urgency (0 for static customers at episode start; updated as time passes for dynamic arrivals)
+- Binary: already visited
+
+Distances are Euclidean throughout. No edge features are needed — the attention mechanism learns pairwise
+relationships from node coordinates directly, which is the standard Kool et al. formulation.
+
+The depot is a special node with zero demand and zero urgency.
+
+#### Dynamic arrivals
+
+When a new customer arrives mid-episode, it is added to the node set with its current urgency value. The encoder
+re-runs on the updated node set. This is the standard way to handle dynamic arrivals in attention-based VRP solvers
+and requires no architectural change.
+
+#### Training
+
+REINFORCE with TONN advantage, identical signal to the Fuzzy agent. This ensures the comparison is fair — both
+methods optimise against the same baseline on the same instances.
+
+---
+
+## 4. Evaluation Protocol
+
+### 4.1 Metrics
+
+Two primary metrics:
+
+1. **Total route cost** — the objective function value C defined in Section 2.5. Lower is better. Report mean
+   and standard deviation over a held-out test set of 200 instances.
+
+2. **Interpretability demonstration** — for the Fuzzy agent, extract the top-10 most frequently fired rules
+   during evaluation and display them with their membership activations. This is qualitative but essential for
+   the thesis argument.
+
+Secondary metrics (reported but not the focus):
+- Recovery time under lateness pressure (how quickly urgency-aware routing prevents penalty accumulation)
+- Performance gap vs TONN across instance difficulty buckets (easy = few outliers, hard = many outliers)
+
+### 4.2 Test Set
+
+200 instances generated with the same structural parameters as training but never seen during training. All three
+methods evaluated on the same 200 instances. Report mean ± std for each method.
+
+### 4.3 Ablation
+
+Run Fuzzy agent with crisp features (hard thresholds replacing membership functions, no fuzzy aggregation).
+This isolates the contribution of the fuzzy representation from the learning component.
 
