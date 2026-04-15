@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, cast
 
 import torch
 
-from .instance_batch import VRPInstanceBatch
+from .instance_batch import VRPInstance, VRPInstanceBatch
 
 
 class VRPEnvironmentBatch:
@@ -78,9 +78,9 @@ class VRPEnvironmentBatch:
 
     def valid_action_mask(self) -> torch.Tensor:
         """
-        (B, N+1) bool where True means action is valid.
+        (B, N+1) bool where True means action is valid. 
 
-        Depot action (index 0) is always valid.
+        Depot action (index 0) is valid only when the truck is not already at depot.
         Customer action j+1 is valid if:
             - customer j has appeared
             - customer j is not visited
@@ -89,7 +89,7 @@ class VRPEnvironmentBatch:
         available = self.available_nodes_mask()
         can_serve = self.instance.node_weights <= self.remaining_cap.unsqueeze(1)
         customer_valid = available & (~self.visited) & can_serve
-        depot_valid = torch.ones(self.batch_size, 1, dtype=torch.bool, device=self.device)
+        depot_valid = (~self.at_depot).unsqueeze(1)
         return torch.cat([depot_valid, customer_valid], dim=1)
 
     def get_observation(self) -> dict[str, torch.Tensor]:
@@ -272,3 +272,45 @@ class VRPEnvironmentBatch:
     def _refresh_done(self) -> None:
         """An instance is done only when every customer has been visited."""
         self.done = self.visited.all(dim=1)
+
+    def extract_environment(self, index: int) -> "VRPEnvironment":
+        """Extract one solved/unsolved environment from the batch as VRPEnvironment."""
+        if index < 0 or index >= self.batch_size:
+            raise IndexError(f"index {index} out of range for batch_size={self.batch_size}")
+        return VRPEnvironment.from_batch_environment(self, index)
+
+
+class VRPEnvironment(VRPEnvironmentBatch):
+    """Single-instance environment wrapper with batch_size fixed to 1."""
+
+    def __init__(
+        self,
+        instance: VRPInstance,
+        lateness_penalty_alpha: float = 1.0,
+    ):
+        super().__init__(instance_batch=instance, lateness_penalty_alpha=lateness_penalty_alpha)
+
+    @property
+    def single_instance(self) -> VRPInstance:
+        return cast(VRPInstance, self.instance)
+
+    @classmethod
+    def from_batch_environment(
+        cls,
+        batch_env: VRPEnvironmentBatch,
+        index: int,
+    ) -> "VRPEnvironment":
+        """Build single environment by copying one slice from a batched environment."""
+        single_instance = batch_env.instance.extract_instance(index)
+        env = cls(instance=single_instance, lateness_penalty_alpha=batch_env.lateness_penalty_alpha)
+
+        env.visited = batch_env.visited[index : index + 1].clone()
+        env.truck_xy = batch_env.truck_xy[index : index + 1].clone()
+        env.at_depot = batch_env.at_depot[index : index + 1].clone()
+        env.remaining_cap = batch_env.remaining_cap[index : index + 1].clone()
+        env.timestep = batch_env.timestep[index : index + 1].clone()
+        env.done = batch_env.done[index : index + 1].clone()
+        env.total_distance = batch_env.total_distance[index : index + 1].clone()
+        env.total_lateness = batch_env.total_lateness[index : index + 1].clone()
+        env.routes = [list(batch_env.routes[index])]
+        return env

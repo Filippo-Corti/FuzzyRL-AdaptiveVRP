@@ -1,11 +1,19 @@
 from typing import Literal
 
 # VRP Instance Generation Config:
-NUM_NODES = 10                                                      # Number of customer nodes (excluding depot)     
+NUM_NODES = 50                                                      # Number of customer nodes (excluding depot)
+TESTSET_BATCH_SIZE = 200                                            # Number of instances to generate for the custom test set
 ENV_DEPOT_MODE: Literal["center", "random"] = "center"              # "center" places depot at (0.5, 0.5), "random" samples depot like other nodes
 ENV_NODE_XY_RANGE = (0.0, 1.0)                                      # Range for x and y coordinates of nodes
-ENV_DEMAND_RANGE = (1, 3)                                           # Range for customer demand (inclusive)
-ENV_CAPACITY_RANGE = (5, 9)                                         # Range for truck capacity (inclusive)
+ENV_WEIGHT_RANGE = (1.0, 5.0)                                       # Range for customer weights
+ENV_W_FIXED = 25.0                                                  # Fixed truck capacity W
+ENV_INITIAL_VISIBLE_RATIO = 0.7                                     # Fraction of customers visible at timestep 0
+ENV_WINDOW_LENGTH_RANGE = (30, 60)                                   # Inclusive time-window length range
+ENV_CLUSTER_COUNT_RANGE = (3, 5)                                    # Number of clusters sampled per instance
+ENV_OUTLIER_COUNT_RANGE = (3, 10)                                   # Number of outlier customers per instance
+ENV_CLUSTER_STD_RANGE = (0.05, 0.14)                                # Cluster std-dev range in normalized coordinates
+CUSTOM_TESTSET_PATH = "datasets/custom/vrp_testset_200_n50.pt"      # Output path for generated custom test set
+CUSTOM_TONN_RESULTS_PATH = "datasets/custom/tonn_distance_results.pt" # Output path for TONN distance-only vs urgency-only results
 
 # Agent Configuration
 AGENT_MODE: Literal["transformer", "fuzzy"] = "transformer"         # "transformer" or "fuzzy"
@@ -21,8 +29,8 @@ FUZZY_LR = 0.01                                                     # Learning r
 FUZZY_GAMMA = 0.95                                                  # Discount factor for future rewards in Q-learning updates
 
 # Transformer agent hyperparameters (overridden if loading from checkpoint)
-TRANSFORMER_NODE_FEATURES = 4                                       # Number of features for each node (e.g. x, y, demand, visited)
-TRANSFORMER_STATE_FEATURES = 3                                      # Number of features for truck state (e.g. x, y, remaining capacity)
+TRANSFORMER_NODE_FEATURES = 6                                       # Number of node features from env: [x, y, demand_norm, appeared, visited, is_depot]
+TRANSFORMER_STATE_FEATURES = 4                                      # Number of truck-state features from env: [x, y, remaining_cap_norm, at_depot]
 TRANSFORMER_D_MODEL = 64                                            # Dimensionality of transformer model embeddings                        
 TRANSFORMER_LR = 1e-4                                               # Learning rate for transformer optimizer                       
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
 import torch
-from typing import Literal
+from typing import Any, Literal, cast
 
 
 class VRPInstanceBatch:
@@ -117,6 +118,78 @@ class VRPInstanceBatch:
 			dtype=torch.long,
 		)
 
+	def extract_instance(self, index: int) -> "VRPInstance":
+		"""Extract one instance from the batch as a standalone VRPInstance."""
+		if index < 0 or index >= self.batch_size:
+			raise IndexError(f"index {index} out of range for batch_size={self.batch_size}")
+		return VRPInstance.from_batch(self, index)
+
+	def save(self, output_path: str | Path) -> None:
+		"""Persist batch tensors and generation metadata to disk."""
+		path = Path(output_path)
+		path.parent.mkdir(parents=True, exist_ok=True)
+
+		payload: dict[str, Any] = {
+			"meta": {
+				"batch_size": self.batch_size,
+				"num_nodes": self.num_nodes,
+				"depot_mode": self.depot_mode,
+				"node_xy_range": self.node_xy_range,
+				"weight_range": self.weight_range,
+				"W_value": self.W_value,
+				"W_range": self.W_range,
+				"initial_visible_ratio": self.initial_visible_ratio,
+				"window_length_range": self.window_length_range,
+				"cluster_count_range": self.cluster_count_range,
+				"outlier_count_range": self.outlier_count_range,
+				"cluster_std_range": self.cluster_std_range,
+			},
+			"node_xy": self.node_xy.detach().cpu(),
+			"depot_xy": self.depot_xy.detach().cpu(),
+			"all_xy": self.all_xy.detach().cpu(),
+			"dist_matrix": self.dist_matrix.detach().cpu(),
+			"node_weights": self.node_weights.detach().cpu(),
+			"W": self.W.detach().cpu(),
+			"appearances": self.appearances.detach().cpu(),
+			"window_lengths": self.window_lengths.detach().cpu(),
+		}
+		torch.save(payload, path)
+
+	@classmethod
+	def load(cls, input_path: str | Path, device: torch.device | None = None) -> "VRPInstanceBatch":
+		"""Load a previously saved batch from disk."""
+		path = Path(input_path)
+		payload = cast(dict[str, Any], torch.load(path, map_location="cpu"))
+		meta = cast(dict[str, Any], payload["meta"])
+
+		batch = cls(
+			batch_size=int(meta["batch_size"]),
+			num_nodes=int(meta["num_nodes"]),
+			device=torch.device("cpu"),
+			depot_mode=cast(Literal["center", "random"], meta["depot_mode"]),
+			node_xy_range=tuple(meta["node_xy_range"]),
+			weight_range=tuple(meta["weight_range"]),
+			W_value=meta["W_value"],
+			W_range=tuple(meta["W_range"]),
+			initial_visible_ratio=float(meta["initial_visible_ratio"]),
+			window_length_range=tuple(meta["window_length_range"]),
+			cluster_count_range=tuple(meta["cluster_count_range"]),
+			outlier_count_range=tuple(meta["outlier_count_range"]),
+			cluster_std_range=tuple(meta["cluster_std_range"]),
+		)
+
+		load_device = device if device is not None else torch.device("cpu")
+		batch.device = load_device
+		batch.node_xy = cast(torch.Tensor, payload["node_xy"]).to(load_device)
+		batch.depot_xy = cast(torch.Tensor, payload["depot_xy"]).to(load_device)
+		batch.all_xy = cast(torch.Tensor, payload["all_xy"]).to(load_device)
+		batch.dist_matrix = cast(torch.Tensor, payload["dist_matrix"]).to(load_device)
+		batch.node_weights = cast(torch.Tensor, payload["node_weights"]).to(load_device)
+		batch.W = cast(torch.Tensor, payload["W"]).to(load_device)
+		batch.appearances = cast(torch.Tensor, payload["appearances"]).to(load_device)
+		batch.window_lengths = cast(torch.Tensor, payload["window_lengths"]).to(load_device)
+		return batch
+
 	def _sample_clustered_nodes_single_instance(self, N: int) -> torch.Tensor:
 		"""Sample customer coordinates with soft clusters + explicit outliers."""
 		low, high = self.node_xy_range
@@ -166,4 +239,66 @@ class VRPInstanceBatch:
 		node_xy = torch.stack(points, dim=0)
 		shuffle = torch.randperm(N, device=d)
 		return node_xy[shuffle]
+
+
+class VRPInstance(VRPInstanceBatch):
+	"""Single-instance VRP wrapper with `batch_size` fixed to 1."""
+
+	def __init__(
+		self,
+		num_nodes: int,
+		device: torch.device,
+		depot_mode: Literal["center", "random"] = "center",
+		node_xy_range: tuple[float, float] = (0.0, 1.0),
+		weight_range: tuple[float, float] = (1.0, 5.0),
+		W_value: float | None = None,
+		W_range: tuple[float, float] = (20.0, 40.0),
+		initial_visible_ratio: float = 0.7,
+		window_length_range: tuple[int, int] = (5, 20),
+		cluster_count_range: tuple[int, int] = (4, 5),
+		outlier_count_range: tuple[int, int] = (1, 2),
+		cluster_std_range: tuple[float, float] = (0.05, 0.14),
+	):
+		super().__init__(
+			batch_size=1,
+			num_nodes=num_nodes,
+			device=device,
+			depot_mode=depot_mode,
+			node_xy_range=node_xy_range,
+			weight_range=weight_range,
+			W_value=W_value,
+			W_range=W_range,
+			initial_visible_ratio=initial_visible_ratio,
+			window_length_range=window_length_range,
+			cluster_count_range=cluster_count_range,
+			outlier_count_range=outlier_count_range,
+			cluster_std_range=cluster_std_range,
+		)
+
+	@classmethod
+	def from_batch(cls, batch: VRPInstanceBatch, index: int) -> "VRPInstance":
+		"""Build a single instance by copying tensors from a batched container."""
+		instance = cls(
+			num_nodes=batch.num_nodes,
+			device=batch.device,
+			depot_mode=cast(Literal["center", "random"], batch.depot_mode),
+			node_xy_range=batch.node_xy_range,
+			weight_range=batch.weight_range,
+			W_value=batch.W_value,
+			W_range=batch.W_range,
+			initial_visible_ratio=batch.initial_visible_ratio,
+			window_length_range=batch.window_length_range,
+			cluster_count_range=batch.cluster_count_range,
+			outlier_count_range=batch.outlier_count_range,
+			cluster_std_range=batch.cluster_std_range,
+		)
+		instance.node_xy = batch.node_xy[index : index + 1].clone()
+		instance.depot_xy = batch.depot_xy[index : index + 1].clone()
+		instance.all_xy = batch.all_xy[index : index + 1].clone()
+		instance.dist_matrix = batch.dist_matrix[index : index + 1].clone()
+		instance.node_weights = batch.node_weights[index : index + 1].clone()
+		instance.W = batch.W[index : index + 1].clone()
+		instance.appearances = batch.appearances[index : index + 1].clone()
+		instance.window_lengths = batch.window_lengths[index : index + 1].clone()
+		return instance
 
