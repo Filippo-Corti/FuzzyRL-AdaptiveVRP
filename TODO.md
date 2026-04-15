@@ -3,13 +3,12 @@
 ### Phase 0 — Environment (start here)
 **Goal:** A working episode loop that all three methods can run against.
 
-- [ ] `VRPInstance` dataclass: cluster generator, outlier placement, demand sampling
-- [ ] `VRPInstance` dataclass: cluster generator, outlier placement, demand sampling, Euclidean cost matrix
-- [ ] `VRPEnvironment`: step function takes target node, accumulates Euclidean travel cost, handles depot returns
-- [ ] Lateness tracking: per-customer arrival time, window, penalty accumulation
-- [ ] TONN implementation: scoring uses Euclidean distance and urgency
-- [ ] Penalty weight calibration: run TONN distance-only vs urgency-only on 20 instances, find interesting α
-- [ ] Episode visualisation: pygame renderer with straight-line routes, urgency-coloured nodes, cost counter
+- [X] `VRPInstance` dataclass: cluster generator, outlier placement, demand sampling, Euclidean cost matrix
+- [X] `VRPEnvironment`: step function takes target node, accumulates Euclidean travel cost, handles depot returns
+- [X] Lateness tracking: per-customer arrival time, window, penalty accumulation
+- [X] TONN implementation: scoring uses Euclidean distance and urgency
+- [X] Penalty weight calibration: run TONN distance-only vs urgency-only on 20 instances, find interesting α
+- [X] Episode visualisation: pygame renderer with straight-line routes, urgency-coloured nodes, cost counter
 
 ### Phase 1 — Fuzzy Agent
 **Goal:** A trainable fuzzy scoring agent that improves over TONN.

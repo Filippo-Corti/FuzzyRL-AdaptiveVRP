@@ -158,6 +158,7 @@ Each customer node is represented as a vector:
 - Demand (normalised by truck capacity)
 - Urgency (0 for static customers at episode start; updated as time passes for dynamic arrivals)
 - Binary: already visited
+- is_depot flag
 
 Distances are Euclidean throughout. No edge features are needed — the attention mechanism learns pairwise
 relationships from node coordinates directly, which is the standard Kool et al. formulation.
