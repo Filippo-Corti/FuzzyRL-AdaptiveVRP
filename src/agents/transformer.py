@@ -96,7 +96,7 @@ class TransformerDecoder(nn.Module):
 
 
 class TransformerAgent:
-    """Attention-based policy for VRP batched environments (inference-only here)."""
+    """Attention-based policy for VRP batched environments."""
 
     def __init__(
         self,

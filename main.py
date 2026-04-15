@@ -11,10 +11,10 @@ from src.ui import plot_metrics_comparison
 from src.vrp import VRPEnvironmentBatch, VRPInstanceBatch
 
 
-def build_testset_batch(device: torch.device) -> VRPInstanceBatch:
+def build_testset_batch(device: torch.device, batch_size: int) -> VRPInstanceBatch:
     """Create the fixed-parameter custom test-set batch from config."""
     return VRPInstanceBatch(
-        batch_size=config.TESTSET_BATCH_SIZE,
+		batch_size=batch_size,
         num_nodes=config.NUM_NODES,
         device=device,
         depot_mode=config.ENV_DEPOT_MODE,
@@ -50,6 +50,18 @@ def print_summary(name: str, distance: torch.Tensor, lateness: torch.Tensor, com
 def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Evaluate TONN and Transformer on custom VRP dataset.")
 	parser.add_argument(
+		"--checkpoint",
+		type=str,
+		default="transformer-3200",
+		help="Transformer checkpoint path or stem name (e.g. transformer-3200).",
+	)
+	parser.add_argument(
+		"--testset-size",
+		type=int,
+		default=500,
+		help="Number of instances in evaluation test set.",
+	)
+	parser.add_argument(
 		"--regenerate",
 		action="store_true",
 		help="Regenerate the custom dataset from config and overwrite the saved file before evaluation.",
@@ -68,6 +80,14 @@ def parse_args() -> argparse.Namespace:
 	return parser.parse_args()
 
 
+def resolve_checkpoint_path(raw_value: str) -> Path:
+	"""Resolve checkpoint from full path or bare stem name."""
+	p = Path(raw_value)
+	if p.suffix:
+		return p
+	return Path("checkpoints") / f"{raw_value}.pt"
+
+
 def main() -> None:
 	args = parse_args()
 
@@ -75,24 +95,36 @@ def main() -> None:
 		torch.manual_seed(config.SEED)
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	requested_size = int(args.testset_size)
 	if args.regenerate:
-		batch = build_testset_batch(device=device)
+		batch = build_testset_batch(device=device, batch_size=requested_size)
 		batch.save(config.CUSTOM_TESTSET_PATH)
 		print(f"Regenerated and saved {batch.batch_size} instances to {config.CUSTOM_TESTSET_PATH}")
 	else:
 		batch = VRPInstanceBatch.load(config.CUSTOM_TESTSET_PATH, device=device)
-		print(f"Loaded {batch.batch_size} instances from {config.CUSTOM_TESTSET_PATH}")
+		if batch.batch_size != requested_size:
+			print(
+				f"Loaded dataset has size {batch.batch_size}, expected {requested_size}. "
+				"Regenerating test set with requested size."
+			)
+			batch = build_testset_batch(device=device, batch_size=requested_size)
+			batch.save(config.CUSTOM_TESTSET_PATH)
+			print(f"Saved regenerated {batch.batch_size}-instance test set to {config.CUSTOM_TESTSET_PATH}")
+		else:
+			print(f"Loaded {batch.batch_size} instances from {config.CUSTOM_TESTSET_PATH}")
 
 	alpha = float(args.alpha)
 	tonn_agent = TONNAgent(w_d=1.0, w_u=-1.0)
 
-	transformer_agent = TransformerAgent(
-		node_features=config.TRANSFORMER_NODE_FEATURES,
-		state_features=config.TRANSFORMER_STATE_FEATURES,
-		d_model=config.TRANSFORMER_D_MODEL,
-		device=device,
-	)
-	print("Using randomly initialized Transformer agent (no checkpoint found)")
+	checkpoint_path = resolve_checkpoint_path(args.checkpoint)
+	if checkpoint_path.exists():
+		transformer_agent = TransformerAgent.load(checkpoint_path, device=device)
+		print(f"Loaded Transformer checkpoint from {checkpoint_path}")
+	else:
+		raise FileNotFoundError(
+			f"Transformer checkpoint not found: {checkpoint_path}. "
+			"Pass --checkpoint with a valid file or stem name."
+		)
 	transformer_agent.eval()
 
 	tonn_distance, tonn_lateness, tonn_combined = run_policy(
@@ -102,7 +134,7 @@ def main() -> None:
 	)
 	transformer_distance, transformer_lateness, transformer_combined = run_policy(
 		batch=batch,
-		select_action_callback=transformer_agent.select_actions,
+		select_action_callback=lambda env: transformer_agent.select_actions(env, greedy=True),
 		alpha=alpha,
 	)
 
@@ -126,6 +158,22 @@ def main() -> None:
 	print(f"Saved comparison results to {results_path}")
 
 	if not args.no_show:
+		plot_metrics_comparison(
+			metrics={
+				"TONN distance": tonn_distance,
+				"Transformer distance": transformer_distance,
+			},
+			title="Distance comparison",
+			y_label="Total distance",
+		)
+		plot_metrics_comparison(
+			metrics={
+				"TONN lateness": tonn_lateness,
+				"Transformer lateness": transformer_lateness,
+			},
+			title="Lateness comparison",
+			y_label="Total lateness",
+		)
 		plot_metrics_comparison(
 			metrics={
 				"TONN combined cost": tonn_combined,

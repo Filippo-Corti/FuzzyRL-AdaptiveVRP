@@ -1,0 +1,333 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal, cast
+
+import torch
+
+import config
+from src.agents import TONNAgent, TransformerAgent
+from src.vrp import VRPEnvironmentBatch, VRPInstanceBatch
+from copy import deepcopy
+
+
+class TransformerTrainer:
+    """Basic REINFORCE trainer with self-greedy baseline and optional TONN monitoring."""
+
+    def __init__(
+        self,
+        agent: TransformerAgent,
+        device: torch.device,
+        lateness_penalty_alpha: float = 0.2,
+        tonn_baseline: TONNAgent | None = None,
+        optimizer_lr: float = config.TRANSFORMER_LR,
+        grad_clip_norm: float = 1.0,
+        checkpoint_path: str = config.CHECKPOINT_TRANSFORMER_PATH,
+        baseline_update_freq: int = 50,
+    ):
+        self.agent = agent
+        self.device = device
+        self.lateness_penalty_alpha = float(lateness_penalty_alpha)
+        self.tonn_baseline = tonn_baseline if tonn_baseline is not None else TONNAgent()
+        self.optimizer_lr = float(optimizer_lr)
+        self.optimizer = torch.optim.Adam(
+            list(self.agent.encoder.parameters())
+            + list(self.agent.decoder.parameters()),
+            lr=self.optimizer_lr,
+        )
+        self.grad_clip_norm = float(grad_clip_norm)
+        self.checkpoint_path = Path(checkpoint_path)
+        self.episode = 0
+        self.baseline_update_freq = int(baseline_update_freq)
+        self.baseline_agent = deepcopy(self.agent)
+        self.baseline_agent.eval()
+        for p in list(self.baseline_agent.encoder.parameters()) + list(self.baseline_agent.decoder.parameters()):
+            p.requires_grad_(False)
+
+    def _build_training_batch(
+        self, batch_size: int, num_nodes: int
+    ) -> VRPInstanceBatch:
+        depot_mode = cast(
+            Literal["center", "random"],
+            getattr(config, "ENV_DEPOT_MODE", "center"),
+        )
+        node_xy_range = cast(tuple[float, float], getattr(config, "ENV_NODE_XY_RANGE", (0.0, 1.0)))
+        weight_range = cast(tuple[float, float], getattr(config, "ENV_WEIGHT_RANGE", (1.0, 5.0)))
+        w_fixed = cast(float | None, getattr(config, "ENV_W_FIXED", None))
+        initial_visible_ratio = cast(float, getattr(config, "ENV_INITIAL_VISIBLE_RATIO", 0.7))
+        window_length_range = cast(tuple[int, int], getattr(config, "ENV_WINDOW_LENGTH_RANGE", (5, 20)))
+        cluster_count_range = cast(tuple[int, int], getattr(config, "ENV_CLUSTER_COUNT_RANGE", (4, 5)))
+        outlier_count_range = cast(tuple[int, int], getattr(config, "ENV_OUTLIER_COUNT_RANGE", (1, 2)))
+        cluster_std_range = cast(tuple[float, float], getattr(config, "ENV_CLUSTER_STD_RANGE", (0.05, 0.14)))
+
+        return VRPInstanceBatch(
+            batch_size=batch_size,
+            num_nodes=num_nodes,
+            device=self.device,
+            depot_mode=depot_mode,
+            node_xy_range=node_xy_range,
+            weight_range=weight_range,
+            W_value=w_fixed,
+            initial_visible_ratio=initial_visible_ratio,
+            window_length_range=window_length_range,
+            cluster_count_range=cluster_count_range,
+            outlier_count_range=outlier_count_range,
+            cluster_std_range=cluster_std_range,
+        )
+
+    def _run_tonn_baseline(self, instance_batch: VRPInstanceBatch) -> torch.Tensor:
+        tonn_env = VRPEnvironmentBatch(
+            instance_batch=instance_batch,
+            lateness_penalty_alpha=self.lateness_penalty_alpha,
+        )
+        with torch.no_grad():
+            tonn_cost = tonn_env.solve(self.tonn_baseline.select_actions)
+        return tonn_cost
+
+    def _run_greedy_baseline(self, instance_batch: VRPInstanceBatch) -> torch.Tensor:
+        env = VRPEnvironmentBatch(
+            instance_batch=instance_batch,
+            lateness_penalty_alpha=self.lateness_penalty_alpha,
+        )
+
+        with torch.no_grad():
+            initial_obs = env.get_observation()
+            static_node_features = self._build_static_encoder_input(initial_obs["node_features"])
+            node_embeddings = self.baseline_agent.encoder(static_node_features)
+
+            max_steps = max(4 * env.num_nodes, env.num_nodes + 1)
+            steps = 0
+            while not bool(env.done.all().item()) and steps < max_steps:
+                obs = env.get_observation()
+                logits = self.baseline_agent.decoder(
+                    node_embeddings=node_embeddings,
+                    truck_state=obs["truck_state"],
+                    invalid_mask=obs["invalid_action_mask"],
+                )
+                actions = logits.argmax(dim=-1).to(torch.long) # Greedy action selection
+
+                # If no valid action exists at this step, fallback to depot wait.
+                valid_any = obs["valid_action_mask"].any(dim=1)
+                actions = torch.where(valid_any, actions, torch.zeros_like(actions))
+                env.execute(actions)
+                steps += 1
+
+        return env.total_distance + self.lateness_penalty_alpha * env.total_lateness
+
+    def _run_sampled_episode(
+        self, instance_batch: VRPInstanceBatch
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        env = VRPEnvironmentBatch(
+            instance_batch=instance_batch,
+            lateness_penalty_alpha=self.lateness_penalty_alpha,
+        )
+
+        initial_obs = env.get_observation()
+        static_node_features = self._build_static_encoder_input(initial_obs["node_features"])
+        node_embeddings = self.agent.encoder(static_node_features)
+
+        log_probs_by_step: list[torch.Tensor] = []
+        entropy_by_step: list[torch.Tensor] = []
+        max_steps = max(4 * env.num_nodes, env.num_nodes + 1)
+        steps = 0
+
+        while not bool(env.done.all().item()) and steps < max_steps:
+            obs = env.get_observation()
+            logits = self.agent.decoder(
+                node_embeddings=node_embeddings,
+                truck_state=obs["truck_state"],
+                invalid_mask=obs["invalid_action_mask"],
+            )
+
+            batch_size = logits.shape[0]
+            valid_any = obs["valid_action_mask"].any(dim=1)
+            actions = torch.zeros(batch_size, dtype=torch.long, device=self.device)
+            log_probs = torch.zeros(batch_size, dtype=torch.float32, device=self.device)
+
+            if bool(valid_any.any().item()):
+                dist = torch.distributions.Categorical(logits=logits[valid_any])
+                sampled_actions = dist.sample()
+                actions[valid_any] = sampled_actions
+                log_probs[valid_any] = dist.log_prob(sampled_actions)
+
+                probs = torch.softmax(logits[valid_any], dim=-1)
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=-1).mean()
+                entropy_by_step.append(entropy)
+
+            log_probs_by_step.append(log_probs)
+            env.execute(actions)
+            steps += 1
+
+        if not log_probs_by_step:
+            raise RuntimeError(
+                "Sampled rollout produced no steps; environment may be in invalid initial state"
+            )
+
+        log_prob_sum = torch.stack(log_probs_by_step, dim=0).sum(dim=0)
+        if entropy_by_step:
+            entropy_mean = torch.stack(entropy_by_step, dim=0).mean()
+        else:
+            entropy_mean = torch.tensor(0.0, device=self.device)
+        combined_cost = (
+            env.total_distance + self.lateness_penalty_alpha * env.total_lateness
+        )
+        return log_prob_sum, env.total_distance, combined_cost, entropy_mean
+
+    def _build_static_encoder_input(self, node_features: torch.Tensor) -> torch.Tensor:
+        """Build static encoder features from [x, y, demand] (+optional is_depot)."""
+        if node_features.dim() != 3 or node_features.shape[-1] < 3:
+            raise ValueError("node_features must have shape (B, N, F) with F >= 3")
+
+        static = torch.zeros_like(node_features)
+        static[..., 0:3] = node_features[..., 0:3]
+
+        # Keep is_depot if present as an additional static feature channel.
+        if node_features.shape[-1] >= 6:
+            static[..., 5] = node_features[..., 5]
+
+        return static
+
+    def train_episode(
+        self,
+        batch_size: int,
+        num_nodes: int,
+        compare_with_tonn: bool = False,
+    ) -> dict[str, float]:
+        self.agent.train()
+
+        instance_batch = self._build_training_batch(
+            batch_size=batch_size, num_nodes=num_nodes
+        )
+        baseline_cost = self._run_greedy_baseline(instance_batch).detach()
+        log_prob_sum, sampled_distance, sampled_cost, entropy_mean = self._run_sampled_episode(
+            instance_batch
+        )
+
+        advantage = baseline_cost - sampled_cost
+
+        loss = -(advantage.detach() * log_prob_sum).mean() - 0.02 * entropy_mean
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(
+            list(self.agent.encoder.parameters())
+            + list(self.agent.decoder.parameters()),
+            max_norm=self.grad_clip_norm,
+        )
+        self.optimizer.step()
+
+        self.episode += 1
+        metrics: dict[str, float] = {
+            "episode": float(self.episode),
+            "loss": float(loss.item()),
+            "baseline_cost_mean": float(baseline_cost.mean().item()),
+            "sampled_cost_mean": float(sampled_cost.mean().item()),
+            "sampled_distance_mean": float(sampled_distance.mean().item()),
+            "advantage_mean": float(advantage.mean().item()),
+            "entropy_mean": float(entropy_mean.item()),
+        }
+
+        if compare_with_tonn:
+            tonn_cost = self._run_tonn_baseline(instance_batch).detach()
+            metrics["tonn_cost_mean"] = float(tonn_cost.mean().item())
+            metrics["sampled_minus_tonn_mean"] = float((sampled_cost - tonn_cost).mean().item())
+            
+        if self.baseline_update_freq > 0 and self.episode % self.baseline_update_freq == 0:
+            self.baseline_agent.encoder.load_state_dict(self.agent.encoder.state_dict())
+            self.baseline_agent.decoder.load_state_dict(self.agent.decoder.state_dict())
+            self.baseline_agent.eval()
+
+        return metrics
+
+    def train(
+        self,
+        num_episodes: int,
+        batch_size: int,
+        num_nodes: int,
+        save_every: int = config.TRAINER_SAVE_EVERY,
+    ) -> None:
+        for _ in range(num_episodes):
+            should_compare_with_tonn = ((self.episode + 1) % int(save_every) == 0)
+            metrics = self.train_episode(
+                batch_size=batch_size,
+                num_nodes=num_nodes,
+                compare_with_tonn=should_compare_with_tonn,
+            )
+            if int(metrics["episode"]) % int(save_every) == 0:
+                
+                print(
+                    f"Episode {int(metrics['episode']):5d} | "
+                    f"loss={metrics['loss']:.4f} | "
+                    f"baseline={metrics['baseline_cost_mean']:.3f} | "
+                    f"sampled={metrics['sampled_cost_mean']:.3f} | "
+                    f"distance={metrics['sampled_distance_mean']:.3f} | "
+                    f"adv={metrics['advantage_mean']:.3f} | "
+                    f"entropy={metrics['entropy_mean']:.4f}"
+                )
+
+                if "tonn_cost_mean" in metrics:
+                    print(
+                        f"TONN monitor | tonn={metrics['tonn_cost_mean']:.3f} | "
+                        f"sampled-tonn={metrics['sampled_minus_tonn_mean']:.3f}"
+                    )
+
+                checkpoint = self.checkpoint_path.with_name(
+                    f"{self.checkpoint_path.stem}-{int(metrics['episode'])}{self.checkpoint_path.suffix}"
+                )
+                self.save_checkpoint(checkpoint)
+                print(f"Saved checkpoint -> {checkpoint}")
+
+    def save_checkpoint(self, path: str | Path | None = None) -> Path:
+        target = Path(path) if path is not None else self.checkpoint_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "episode": self.episode,
+                "optimizer_lr": self.optimizer_lr,
+                "node_features": self.agent.encoder.input_proj.in_features,
+                "state_features": self.agent.decoder.query_proj.in_features,
+                "d_model": self.agent.encoder.input_proj.out_features,
+                "encoder": self.agent.encoder.state_dict(),
+                "decoder": self.agent.decoder.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+            },
+            target,
+        )
+        return target
+
+    @classmethod
+    def load_checkpoint(
+        cls,
+        path: str | Path,
+        device: torch.device,
+        lateness_penalty_alpha: float = 0.2,
+        tonn_baseline: TONNAgent | None = None,
+        grad_clip_norm: float = 1.0,
+        checkpoint_path: str = config.CHECKPOINT_TRANSFORMER_PATH,
+    ) -> "TransformerTrainer":
+        ckpt = torch.load(path, map_location=device)
+
+        agent = TransformerAgent(
+            node_features=int(ckpt["node_features"]),
+            state_features=int(ckpt["state_features"]),
+            d_model=int(ckpt["d_model"]),
+            device=device,
+        )
+        agent.encoder.load_state_dict(ckpt["encoder"])
+        agent.decoder.load_state_dict(ckpt["decoder"])
+
+        trainer = cls(
+            agent=agent,
+            device=device,
+            lateness_penalty_alpha=lateness_penalty_alpha,
+            tonn_baseline=tonn_baseline,
+            optimizer_lr=float(ckpt.get("optimizer_lr", config.TRANSFORMER_LR)),
+            grad_clip_norm=grad_clip_norm,
+            checkpoint_path=checkpoint_path,
+        )
+
+        optimizer_state = ckpt.get("optimizer")
+        if optimizer_state is not None:
+            trainer.optimizer.load_state_dict(optimizer_state)
+        trainer.episode = int(ckpt.get("episode", 0))
+        return trainer

@@ -10,7 +10,19 @@
 - [X] Penalty weight calibration: run TONN distance-only vs urgency-only on 20 instances, find interesting α
 - [X] Episode visualisation: pygame renderer with straight-line routes, urgency-coloured nodes, cost counter
 
-### Phase 1 — Fuzzy Agent
+
+### Phase 1 — Transformer Agent
+**Goal:** Port and adapt the existing course project Transformer to this environment.
+
+- [X] Node feature construction: (x, y, demand, urgency, visited) per customer + depot
+- [X] Dynamic arrival handling: re-encode on new customer arrival (or mask with urgency update)
+- [X] Decoder: pointer network over unvisited feasible customers, depot as always-available option
+- [ ] REINFORCE loop: same advantage signal as Fuzzy agent
+- [ ] Entropy regularisation: confirm it does not collapse early (lesson from course project)
+- [ ] EMA baseline as secondary option if TONN advantage proves unstable
+- [ ] Validation: confirm convergence on 10-customer instances before scaling to 50
+
+### Phase 2 — Fuzzy Agent
 **Goal:** A trainable fuzzy scoring agent that improves over TONN.
 
 - [ ] `FuzzyMembership`: triangular MF class with learnable breakpoints, forward pass returns label→weight dict
@@ -21,17 +33,6 @@
 - [ ] Membership breakpoint update: gradient of expected advantage w.r.t. breakpoints
 - [ ] Training diagnostics: reward curve, rule firing frequency, membership function shape evolution
 - [ ] Validation: confirm agent improves over random and approaches TONN within ~500 episodes
-
-### Phase 2 — Transformer Agent
-**Goal:** Port and adapt the existing course project Transformer to this environment.
-
-- [ ] Node feature construction: (x, y, demand, urgency, visited) per customer + depot
-- [ ] Dynamic arrival handling: re-encode on new customer arrival (or mask with urgency update)
-- [ ] Decoder: pointer network over unvisited feasible customers, depot as always-available option
-- [ ] REINFORCE loop: same advantage signal as Fuzzy agent
-- [ ] Entropy regularisation: confirm it does not collapse early (lesson from course project)
-- [ ] EMA baseline as secondary option if TONN advantage proves unstable
-- [ ] Validation: confirm convergence on 10-customer instances before scaling to 50
 
 ### Phase 3 — Evaluation & Ablation
 **Goal:** Clean comparative results ready for report and presentation.
