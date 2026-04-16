@@ -32,19 +32,20 @@ CUSTOM_TONN_RESULTS_PATH = "datasets/custom/tonn_distance_results.pt" # Output p
 
 # Agent Configuration
 AGENT_MODE: Literal["transformer", "fuzzy"] = "transformer"         # "transformer" or "fuzzy"
-CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer-3200.pt"          # Path to trained transformer agent checkpoint
+CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"          # Path to trained transformer agent checkpoint
 CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"                     # Path to trained fuzzy agent checkpoint (pickle file)
 SEED = None                                                         # Set to an int for visualizing the same instance
 
 # Fuzzy agent hyperparameters (overridden if loading from checkpoint)
+FUZZY_BATCH_SIZE = 512                                              # Number of VRP instances to train on in parallel (fuzzy agent only)
 FUZZY_EPSILON = 0.9                                                 # Initial exploration rate for epsilon-greedy action selection
 FUZZY_EPSILON_MIN = 0.001                                            # Minimum exploration rate after decay                
 FUZZY_EPSILON_DECAY = 0.9995                                         # Multiplicative decay factor for epsilon after each episode
-FUZZY_LR = 0.01                                                     # Learning rate for Q-table updates
+FUZZY_LR = 1e-3                                                     # Learning rate for Q-table updates
 FUZZY_GAMMA = 0.95                                                  # Discount factor for future rewards in Q-learning updates
 
 # Transformer agent hyperparameters (overridden if loading from checkpoint)
-TRANSFORMER_NODE_FEATURES = 6                                       # Number of node features from env: [x, y, demand_norm, appeared, visited, is_depot]
+TRANSFORMER_NODE_FEATURES = 6                                       # Number of node features from env: [x, y, demand_norm, urgency, visited, is_depot]
 TRANSFORMER_STATE_FEATURES = 4                                      # Number of truck-state features from env: [x, y, remaining_cap_norm, at_depot]
 TRANSFORMER_D_MODEL = 128                                           # Dimensionality of transformer model embeddings                        
 TRANSFORMER_LR = 1e-4                                               # Learning rate for transformer optimizer                       
