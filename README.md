@@ -115,14 +115,14 @@ structure and will plateau near greedy performance on clustered instances.
 
 #### Fuzzy membership functions
 
-Each feature is mapped to linguistic labels via triangular membership functions:
+Each feature is mapped to linguistic labels via triangular (or gaussian?) membership functions:
 - Distance: {Near, Medium, Far}
 - Urgency: {Low, Moderate, High}
 - Demand ratio: {Light, Moderate, Heavy}
 - Cluster density: {Sparse, Moderate, Dense}
 - Detour cost: {Cheap, Moderate, Expensive}
 
-Breakpoints are stored as learnable parameters and updated after each episode (see Section 5.2).
+Breakpoints are stored as learnable parameters and updated after each episode.
 
 #### Rule base
 

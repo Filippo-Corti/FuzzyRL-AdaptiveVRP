@@ -17,10 +17,11 @@
 - [X] Node feature construction: (x, y, demand, urgency, visited) per customer + depot
 - [X] Dynamic arrival handling: re-encode on new customer arrival (or mask with urgency update)
 - [X] Decoder: pointer network over unvisited feasible customers, depot as always-available option
-- [ ] REINFORCE loop: same advantage signal as Fuzzy agent
-- [ ] Entropy regularisation: confirm it does not collapse early (lesson from course project)
-- [ ] EMA baseline as secondary option if TONN advantage proves unstable
-- [ ] Validation: confirm convergence on 10-customer instances before scaling to 50
+- [X] REINFORCE loop: same advantage signal as Fuzzy agent
+- [X] Entropy regularisation: confirm it does not collapse early (lesson from course project)
+- [X] Frozen learned baseline as secondary option if TONN advantage proves unstable
+- [X] Validation: confirm convergence on 10-customer instances before scaling to 30
+- [ ] Scaling to 50 customers.
 
 ### Phase 2 — Fuzzy Agent
 **Goal:** A trainable fuzzy scoring agent that improves over TONN.

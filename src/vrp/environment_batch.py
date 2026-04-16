@@ -97,7 +97,7 @@ class VRPEnvironmentBatch:
         Build a callback-friendly batched observation on the current device.
 
         Returns keys:
-            node_features:     (B, N+1, 6) = [x, y, weight_norm, appeared, visited, is_depot]
+            node_features:     (B, N+1, 6) = [x, y, weight_norm, urgency, visited, is_depot]
             truck_state:       (B, 4)      = [truck_x, truck_y, remaining_cap_norm, at_depot]
             valid_action_mask: (B, N+1) bool  (True = valid)
             invalid_action_mask:(B, N+1) bool (True = invalid)
@@ -109,14 +109,14 @@ class VRPEnvironmentBatch:
         # Depot row
         depot_xy = self.instance.depot_xy.unsqueeze(1)  # (B, 1, 2)
         depot_weight = torch.zeros(B, 1, 1, device=self.device)
-        depot_appeared = torch.ones(B, 1, 1, device=self.device)
+        depot_urgency = torch.zeros(B, 1, 1, device=self.device)
         depot_visited = torch.ones(B, 1, 1, device=self.device)
         depot_is_depot = torch.ones(B, 1, 1, device=self.device)
         depot_features = torch.cat(
             [
                 depot_xy,
                 depot_weight,
-                depot_appeared,
+                depot_urgency,
                 depot_visited,
                 depot_is_depot,
             ],
@@ -124,7 +124,13 @@ class VRPEnvironmentBatch:
         )  # (B, 1, 6)
 
         # Customer rows
-        appeared = self.available_nodes_mask().unsqueeze(-1).to(torch.float32)  # (B, N, 1)
+        time_elapsed = (
+            self.timestep.unsqueeze(1) - self.instance.appearances
+        ).clamp(min=0).to(torch.float32)
+        urgency = (
+            time_elapsed
+            / (self.instance.window_lengths.to(torch.float32) + 1e-9)
+        ).clamp(0.0, 1.0).unsqueeze(-1)  # (B, N, 1)
         visited = self.visited.unsqueeze(-1).to(torch.float32)  # (B, N, 1)
         is_depot = torch.zeros(B, self.num_nodes, 1, device=self.device)
         weight_norm = self.instance.node_weights / self.instance.W.unsqueeze(1)
@@ -132,7 +138,7 @@ class VRPEnvironmentBatch:
             [
                 self.instance.node_xy,
                 weight_norm.unsqueeze(-1),
-                appeared,
+                urgency,
                 visited,
                 is_depot,
             ],

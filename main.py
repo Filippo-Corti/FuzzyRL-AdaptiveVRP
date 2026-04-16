@@ -52,8 +52,8 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument(
 		"--checkpoint",
 		type=str,
-		default="transformer-3200",
-		help="Transformer checkpoint path or stem name (e.g. transformer-3200).",
+		default="transformer-3500",
+		help="Transformer checkpoint path or stem name (e.g. transformer-3500).",
 	)
 	parser.add_argument(
 		"--testset-size",

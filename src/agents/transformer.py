@@ -116,6 +116,9 @@ class TransformerAgent:
     def train(self) -> None:
         self.encoder.train()
         self.decoder.train()
+        
+    def parameters(self, recurse: bool = True) -> list[torch.nn.Parameter]:
+        return list(self.encoder.parameters(recurse)) + list(self.decoder.parameters(recurse))
 
     def forward(
         self,
