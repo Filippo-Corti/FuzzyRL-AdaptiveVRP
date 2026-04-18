@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 import math
 from copy import deepcopy
 from pathlib import Path
@@ -19,7 +18,6 @@ import torch.nn.functional as F
 # Verify these match your VRPEnvironmentBatch.get_observation() output.
 # ---------------------------------------------------------------------------
 
-# TODO: Check these cause I think the urgency is wrong and there is no urgency in the observation? This would be a big problem for the transformer as well.
 # node_features layout assumptions (same as Transformer):
 #   [0] = x, [1] = y, [2] = demand (normalised), [3] = urgency,
 #   [4] = visited flag, [5] = is_depot flag
@@ -32,7 +30,7 @@ _NODE_DEMAND_IDX = 2
 _NODE_URGENCY_IDX = 3
 _NODE_VISITED_IDX = 4
 
-CLUSTER_RADIUS = 0.2   # radius for cluster density; tune if needed
+CLUSTER_RADIUS = 0.2  # radius for cluster density; tune if needed
 NUM_FEATURES = 5
 NUM_LABELS = 3
 
@@ -40,6 +38,7 @@ NUM_LABELS = 3
 # ---------------------------------------------------------------------------
 # Triangular membership function
 # ---------------------------------------------------------------------------
+
 
 class TriangularMF(nn.Module):
     """
@@ -57,8 +56,12 @@ class TriangularMF(nn.Module):
         assert a < b < c, "Initialisation requires a < b < c"
         self._base = nn.Parameter(torch.tensor(a, dtype=torch.float32))
         # Inverse softplus: softplus_inv(x) = log(exp(x) - 1)
-        self._d1 = nn.Parameter(torch.tensor(math.log(math.expm1(b - a)), dtype=torch.float32))
-        self._d2 = nn.Parameter(torch.tensor(math.log(math.expm1(c - b)), dtype=torch.float32))
+        self._d1 = nn.Parameter(
+            torch.tensor(math.log(math.expm1(b - a)), dtype=torch.float32)
+        )
+        self._d2 = nn.Parameter(
+            torch.tensor(math.log(math.expm1(c - b)), dtype=torch.float32)
+        )
 
     @property
     def breakpoints(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -69,7 +72,7 @@ class TriangularMF(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         a, b, c = self.breakpoints
-        left  = (x - a) / (b - a + 1e-8)
+        left = (x - a) / (b - a + 1e-8)
         right = (c - x) / (c - b + 1e-8)
         return torch.clamp(torch.min(left, right), 0.0, 1.0)
 
@@ -77,6 +80,7 @@ class TriangularMF(nn.Module):
 # ---------------------------------------------------------------------------
 # Three-label fuzzy feature (Low / Medium / High)
 # ---------------------------------------------------------------------------
+
 
 class FuzzyFeature(nn.Module):
     """
@@ -89,9 +93,9 @@ class FuzzyFeature(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.low    = TriangularMF(-0.5, 0.0,  0.5)
-        self.medium = TriangularMF( 0.0, 0.5,  1.0)
-        self.high   = TriangularMF( 0.5, 1.0,  1.5)
+        self.low = TriangularMF(-0.5, 0.0, 0.5)
+        self.medium = TriangularMF(0.0, 0.5, 1.0)
+        self.high = TriangularMF(0.5, 1.0, 1.5)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """x: (...,)  →  (..., 3)  [Low, Medium, High] membership degrees."""
@@ -101,6 +105,7 @@ class FuzzyFeature(nn.Module):
 # ---------------------------------------------------------------------------
 # Fuzzy Agent
 # ---------------------------------------------------------------------------
+
 
 class FuzzyAgent(nn.Module):
     """
@@ -133,22 +138,25 @@ class FuzzyAgent(nn.Module):
         super().__init__()
         self.device = device
 
-        self.mf_distance        = FuzzyFeature()
-        self.mf_urgency         = FuzzyFeature()
-        self.mf_demand_ratio    = FuzzyFeature()
+        self.mf_distance = FuzzyFeature()
+        self.mf_urgency = FuzzyFeature()
+        self.mf_demand_ratio = FuzzyFeature()
         self.mf_cluster_density = FuzzyFeature()
-        self.mf_detour_cost     = FuzzyFeature()
+        self.mf_detour_cost = FuzzyFeature()
 
         # rule_weights[f, l] = contribution of label l of feature f to priority
         # Shape: (NUM_FEATURES=5, NUM_LABELS=3)
-        init = torch.tensor([
-            # Low   Medium  High
-            [ 0.5,   0.0,  -0.5],  # distance:        near=good, far=bad
-            [-0.5,   0.0,   0.5],  # urgency:          urgent=good
-            [ 0.5,   0.0,  -0.5],  # demand_ratio:     light=good (more room)
-            [-0.5,   0.0,   0.5],  # cluster_density:  dense=good
-            [ 0.5,   0.0,  -0.5],  # detour_cost:      cheap=good
-        ], dtype=torch.float32)
+        init = torch.tensor(
+            [
+                # Low   Medium  High
+                [0.5, 0.0, -0.5],  # distance:        near=good, far=bad
+                [-0.5, 0.0, 0.5],  # urgency:          urgent=good
+                [0.5, 0.0, -0.5],  # demand_ratio:     light=good (more room)
+                [-0.5, 0.0, 0.5],  # cluster_density:  dense=good
+                [0.5, 0.0, -0.5],  # detour_cost:      cheap=good
+            ],
+            dtype=torch.float32,
+        )
         self.rule_weights = nn.Parameter(init)
 
         self.to(device)
@@ -160,59 +168,62 @@ class FuzzyAgent(nn.Module):
     def _compute_features(
         self,
         obs: dict[str, torch.Tensor],
-        dist_matrix: torch.Tensor,   # (B, N+1, N+1) precomputed from instance
-        depot_xy: torch.Tensor,       # (B, 2)
+        dist_matrix: torch.Tensor,  # (B, N+1, N+1) precomputed from instance
+        depot_xy: torch.Tensor,  # (B, 2)
     ) -> torch.Tensor:
         """Returns (B, N+1, 5) normalised features."""
-        node_features = obs["node_features"]   # (B, N+1, F)
-        truck_state   = obs["truck_state"]     # (B, S)
+        node_features = obs["node_features"]  # (B, N+1, F)
+        truck_state = obs["truck_state"]  # (B, S)
         B, N1, _ = node_features.shape
 
-        truck_xy   = truck_state[:, _TRUCK_X_IDX:_TRUCK_Y_IDX + 1]  # (B, 2)
-        rem_cap    = truck_state[:, _TRUCK_CAP_IDX].unsqueeze(1)     # (B, 1)
+        truck_xy = truck_state[:, _TRUCK_X_IDX : _TRUCK_Y_IDX + 1]  # (B, 2)
+        rem_cap = truck_state[:, _TRUCK_CAP_IDX].unsqueeze(1)  # (B, 1)
 
-        all_xy = torch.cat([depot_xy.unsqueeze(1),
-                            node_features[:, 1:, :2]], dim=1)        # (B, N+1, 2)
+        all_xy = torch.cat(
+            [depot_xy.unsqueeze(1), node_features[:, 1:, :2]], dim=1
+        )  # (B, N+1, 2)
 
         # --- 0: distance ---
-        diff = all_xy - truck_xy.unsqueeze(1)                         # (B, N+1, 2)
-        dist_to_nodes = torch.norm(diff, dim=-1)                      # (B, N+1)
+        diff = all_xy - truck_xy.unsqueeze(1)  # (B, N+1, 2)
+        dist_to_nodes = torch.norm(diff, dim=-1)  # (B, N+1)
         feat_distance = (dist_to_nodes / math.sqrt(2)).clamp(0.0, 1.0)
 
         # --- 1: urgency ---
         feat_urgency = node_features[..., _NODE_URGENCY_IDX].clamp(0.0, 1.0)
 
         # --- 2: demand ratio ---
-        demands = node_features[..., _NODE_DEMAND_IDX]                # (B, N+1)
+        demands = node_features[..., _NODE_DEMAND_IDX]  # (B, N+1)
         feat_demand_ratio = (demands / (rem_cap + 1e-8)).clamp(0.0, 1.0)
 
         # --- 3: cluster density ---
-        visited = node_features[..., _NODE_VISITED_IDX]               # (B, N+1)
-        unvisited = (1.0 - visited).unsqueeze(1)                      # (B, 1, N+1)
-        within = (dist_matrix < CLUSTER_RADIUS).float()               # (B, N+1, N+1)
+        visited = node_features[..., _NODE_VISITED_IDX]  # (B, N+1)
+        unvisited = (1.0 - visited).unsqueeze(1)  # (B, 1, N+1)
+        within = (dist_matrix < CLUSTER_RADIUS).float()  # (B, N+1, N+1)
         within = within * unvisited
         eye = torch.eye(N1, device=self.device).unsqueeze(0)
         within = within * (1.0 - eye)
-        density = within.sum(dim=-1)                                  # (B, N+1)
+        density = within.sum(dim=-1)  # (B, N+1)
         feat_cluster = (density / float(N1 - 1 + 1e-8)).clamp(0.0, 1.0)
 
         # --- 4: detour cost ---
-        dist_node_depot = dist_matrix[:, :, 0]                        # (B, N+1)
-        dist_truck_depot = torch.norm(
-            truck_xy - depot_xy, dim=-1
-        ).unsqueeze(1)                                                 # (B, 1)
-        detour = dist_to_nodes + dist_node_depot - dist_truck_depot    # (B, N+1)
-        mean_d = dist_matrix.mean(dim=(1, 2), keepdim=False
-                                  ).mean().clamp(min=1e-8)
+        dist_node_depot = dist_matrix[:, :, 0]  # (B, N+1)
+        dist_truck_depot = torch.norm(truck_xy - depot_xy, dim=-1).unsqueeze(
+            1
+        )  # (B, 1)
+        detour = dist_to_nodes + dist_node_depot - dist_truck_depot  # (B, N+1)
+        mean_d = dist_matrix.mean(dim=(1, 2), keepdim=False).mean().clamp(min=1e-8)
         feat_detour = (detour / (2.0 * mean_d)).clamp(0.0, 1.0)
 
-        return torch.stack([
-            feat_distance,
-            feat_urgency,
-            feat_demand_ratio,
-            feat_cluster,
-            feat_detour,
-        ], dim=-1)  # (B, N+1, 5)
+        return torch.stack(
+            [
+                feat_distance,
+                feat_urgency,
+                feat_demand_ratio,
+                feat_cluster,
+                feat_detour,
+            ],
+            dim=-1,
+        )  # (B, N+1, 5)
 
     # ------------------------------------------------------------------
     # Forward pass
@@ -230,16 +241,19 @@ class FuzzyAgent(nn.Module):
         """
         features = self._compute_features(obs, dist_matrix, depot_xy)  # (B, N+1, 5)
 
-        acts = torch.stack([
-            self.mf_distance(features[..., 0]),
-            self.mf_urgency(features[..., 1]),
-            self.mf_demand_ratio(features[..., 2]),
-            self.mf_cluster_density(features[..., 3]),
-            self.mf_detour_cost(features[..., 4]),
-        ], dim=2)  # (B, N+1, 5, 3)
+        acts = torch.stack(
+            [
+                self.mf_distance(features[..., 0]),
+                self.mf_urgency(features[..., 1]),
+                self.mf_demand_ratio(features[..., 2]),
+                self.mf_cluster_density(features[..., 3]),
+                self.mf_detour_cost(features[..., 4]),
+            ],
+            dim=2,
+        )  # (B, N+1, 5, 3)
 
-        weighted = acts * self.rule_weights.unsqueeze(0).unsqueeze(0)   # (B, N+1, 5, 3)
-        logits = weighted.sum(dim=(-1, -2))                             # (B, N+1)
+        weighted = acts * self.rule_weights.unsqueeze(0).unsqueeze(0)  # (B, N+1, 5, 3)
+        logits = weighted.sum(dim=(-1, -2))  # (B, N+1)
         logits = logits.masked_fill(invalid_mask, float("-inf"))
         return logits
 
@@ -277,7 +291,9 @@ class FuzzyAgent(nn.Module):
         agent = cls(device=device)
         ckpt = torch.load(path, map_location=device)
         # Support both direct agent state_dict files and trainer checkpoint wrappers.
-        state_dict = ckpt["agent"] if isinstance(ckpt, dict) and "agent" in ckpt else ckpt
+        state_dict = (
+            ckpt["agent"] if isinstance(ckpt, dict) and "agent" in ckpt else ckpt
+        )
         agent.load_state_dict(state_dict)
         return agent
 
@@ -290,8 +306,14 @@ class FuzzyAgent(nn.Module):
         Return top-k (feature, label, weight) triples by absolute weight.
         Useful for the rule display panel in the pygame demo.
         """
-        feature_names = ["distance", "urgency", "demand_ratio", "cluster_density", "detour_cost"]
-        label_names   = ["low", "medium", "high"]
+        feature_names = [
+            "distance",
+            "urgency",
+            "demand_ratio",
+            "cluster_density",
+            "detour_cost",
+        ]
+        label_names = ["low", "medium", "high"]
         w = self.rule_weights.detach().cpu()
         entries = [
             (feature_names[f], label_names[l], float(w[f, l]))

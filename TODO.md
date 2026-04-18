@@ -21,28 +21,26 @@
 - [X] Entropy regularisation: confirm it does not collapse early (lesson from course project)
 - [X] Frozen learned baseline as secondary option if TONN advantage proves unstable
 - [X] Validation: confirm convergence on 10-customer instances before scaling to 30
-- [ ] Scaling to 50 customers.
 
 ### Phase 2 — Fuzzy Agent
 **Goal:** A trainable fuzzy scoring agent that improves over TONN.
 
-- [ ] `FuzzyMembership`: triangular MF class with learnable breakpoints, forward pass returns label→weight dict
-- [ ] `FuzzyScorer`: takes candidate feature vector, returns priority score via rule base
-- [ ] `FuzzyAgent`: wraps scorer, implements candidate selection (argmax over scores)
-- [ ] REINFORCE loop: episode rollout, cost computation, TONN advantage, gradient update
-- [ ] Rule weight update: gradient of expected advantage w.r.t. rule weights
-- [ ] Membership breakpoint update: gradient of expected advantage w.r.t. breakpoints
-- [ ] Training diagnostics: reward curve, rule firing frequency, membership function shape evolution
-- [ ] Validation: confirm agent improves over random and approaches TONN within ~500 episodes
+- [X] `FuzzyMembership`: triangular MF class with learnable breakpoints, forward pass returns label→weight dict
+- [X] `FuzzyScorer`: takes candidate feature vector, returns priority score via rule base
+- [X] `FuzzyAgent`: wraps scorer, implements candidate selection (argmax over scores)
+- [X] REINFORCE loop: episode rollout, cost computation, TONN advantage, gradient update
+- [X] Rule weight update: gradient of expected advantage w.r.t. rule weights
+- [X] Membership breakpoint update: gradient of expected advantage w.r.t. breakpoints
+- [X] Training diagnostics: reward curve, rule firing frequency, membership function shape evolution
+- [X] Validation: confirm agent improves over random and approaches TONN within ~500 episodes
 
 ### Phase 3 — Evaluation & Ablation
 **Goal:** Clean comparative results ready for report and presentation.
 
-- [ ] Generate held-out test set of 200 instances, fix random seed
+- [X] Generate held-out test set of 200 instances, fix random seed
 - [ ] Evaluate all three methods on test set, record C for each instance
 - [ ] Compute mean ± std per method, statistical significance test (paired t-test vs TONN)
-- [ ] Ablation: crisp Fuzzy agent (replace MFs with hard thresholds), same training budget
-- [ ] Rule extraction: log top-10 rules fired during Fuzzy agent evaluation, format for report
+- [X] Rule extraction: log top-10 rules fired during Fuzzy agent evaluation, format for report
 - [ ] Learning curves: plot reward vs episode for both learned methods
 
 ### Phase 4 — Visualisation & Demo

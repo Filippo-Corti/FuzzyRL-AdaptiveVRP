@@ -276,8 +276,8 @@ class VRPEnvironmentBatch:
         return self.total_distance + self.lateness_penalty_alpha * self.total_lateness
 
     def _refresh_done(self) -> None:
-        """An instance is done only when every customer has been visited."""
-        self.done = self.visited.all(dim=1)
+        """An instance is done only when every customer is visited and truck is at depot."""
+        self.done = self.visited.all(dim=1) & self.at_depot
 
     def extract_environment(self, index: int) -> "VRPEnvironment":
         """Extract one solved/unsolved environment from the batch as VRPEnvironment."""

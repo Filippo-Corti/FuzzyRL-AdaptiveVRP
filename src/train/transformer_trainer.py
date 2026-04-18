@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
 from copy import deepcopy
 
 import torch
@@ -52,45 +51,19 @@ class TransformerTrainer:
     def _build_training_batch(
         self, batch_size: int, num_nodes: int
     ) -> VRPInstanceBatch:
-        # TODO: remove all these useless casts. If needed, add type annotation to config.py instead.
-        depot_mode = cast(
-            Literal["center", "random"],
-            getattr(config, "ENV_DEPOT_MODE", "center"),
-        )
-        node_xy_range = config.ENV_NODE_XY_RANGE
-        weight_range = cast(
-            tuple[float, float], getattr(config, "ENV_WEIGHT_RANGE", (1.0, 5.0))
-        )
-        w_fixed = cast(float | None, getattr(config, "ENV_W_FIXED", None))
-        initial_visible_ratio = cast(
-            float, getattr(config, "ENV_INITIAL_VISIBLE_RATIO", 0.7)
-        )
-        window_length_range = cast(
-            tuple[int, int], getattr(config, "ENV_WINDOW_LENGTH_RANGE", (5, 20))
-        )
-        cluster_count_range = cast(
-            tuple[int, int], getattr(config, "ENV_CLUSTER_COUNT_RANGE", (4, 5))
-        )
-        outlier_count_range = cast(
-            tuple[int, int], getattr(config, "ENV_OUTLIER_COUNT_RANGE", (1, 2))
-        )
-        cluster_std_range = cast(
-            tuple[float, float], getattr(config, "ENV_CLUSTER_STD_RANGE", (0.05, 0.14))
-        )
-
         return VRPInstanceBatch(
             batch_size=batch_size,
             num_nodes=num_nodes,
             device=self.device,
-            depot_mode=depot_mode,
-            node_xy_range=node_xy_range,
-            weight_range=weight_range,
-            W_value=w_fixed,
-            initial_visible_ratio=initial_visible_ratio,
-            window_length_range=window_length_range,
-            cluster_count_range=cluster_count_range,
-            outlier_count_range=outlier_count_range,
-            cluster_std_range=cluster_std_range,
+            depot_mode=config.ENV_DEPOT_MODE,
+            node_xy_range=config.ENV_NODE_XY_RANGE,
+            weight_range=config.ENV_WEIGHT_RANGE,
+            W_value=config.ENV_W_FIXED,
+            initial_visible_ratio=config.ENV_INITIAL_VISIBLE_RATIO,
+            window_length_range=config.ENV_WINDOW_LENGTH_RANGE,
+            cluster_count_range=config.ENV_CLUSTER_COUNT_RANGE,
+            outlier_count_range=config.ENV_OUTLIER_COUNT_RANGE,
+            cluster_std_range=config.ENV_CLUSTER_STD_RANGE,
         )
 
     def _run_tonn_baseline(self, instance_batch: VRPInstanceBatch) -> torch.Tensor:
