@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 
-import config
+from src import config
 from src.agents import TONNAgent
 from src.agents.fuzzy import FuzzyAgent
 from src.vrp import VRPEnvironmentBatch, VRPInstanceBatch

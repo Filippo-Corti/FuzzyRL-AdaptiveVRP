@@ -24,7 +24,7 @@ FUZZY_LR = 1e-3
 # Visualization configuration used by src/ui
 VIS_CHECKPOINTS_DIR = "checkpoints"
 VIS_LATENESS_ALPHA = 0.2
-VIS_WINDOW_WIDTH = 1920
+VIS_WINDOW_WIDTH = 1600
 VIS_WINDOW_HEIGHT = 1000
 VIS_MIN_WINDOW_WIDTH = 1100
 VIS_MIN_WINDOW_HEIGHT = 700
@@ -41,14 +41,14 @@ VIS_FONT_SCALE_MIN = 0.85
 VIS_FONT_SCALE_MAX = 1.35
 VIS_FANCY_MODE = False
 VIS_ROUTE_PALETTE = [
-	(15, 93, 255),
-	(255, 77, 77),
-	(27, 164, 95),
-	(255, 150, 46),
-	(140, 94, 255),
-	(255, 45, 133),
-	(0, 171, 194),
-	(199, 113, 19),
-	(78, 97, 114),
-	(196, 39, 110),
+    (15, 93, 255),
+    (255, 77, 77),
+    (27, 164, 95),
+    (255, 150, 46),
+    (140, 94, 255),
+    (255, 45, 133),
+    (0, 171, 194),
+    (199, 113, 19),
+    (78, 97, 114),
+    (196, 39, 110),
 ]

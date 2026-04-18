@@ -8,7 +8,7 @@ from typing import Literal
 import pygame
 import torch
 
-import config
+from src import config
 from src.agents import TONNAgent, TransformerAgent
 from src.agents.fuzzy import FuzzyAgent
 from src.ui.sprites import VisualizationSprites
