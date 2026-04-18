@@ -250,10 +250,13 @@ class FuzzyAgent(nn.Module):
     @torch.no_grad()
     def select_actions(self, env, greedy: bool = True) -> torch.Tensor:
         obs = env.get_observation()
+        instance_batch = getattr(env, "instance_batch", None)
+        if instance_batch is None:
+            instance_batch = getattr(env, "instance")
         logits = self.forward(
             obs=obs,
-            dist_matrix=env.instance_batch.dist_matrix,
-            depot_xy=env.instance_batch.depot_xy,
+            dist_matrix=instance_batch.dist_matrix,
+            depot_xy=instance_batch.depot_xy,
             invalid_mask=obs["invalid_action_mask"],
         )
         if greedy:
@@ -272,7 +275,10 @@ class FuzzyAgent(nn.Module):
     @classmethod
     def load(cls, path: str | Path, device: torch.device) -> "FuzzyAgent":
         agent = cls(device=device)
-        agent.load_state_dict(torch.load(path, map_location=device))
+        ckpt = torch.load(path, map_location=device)
+        # Support both direct agent state_dict files and trainer checkpoint wrappers.
+        state_dict = ckpt["agent"] if isinstance(ckpt, dict) and "agent" in ckpt else ckpt
+        agent.load_state_dict(state_dict)
         return agent
 
     # ------------------------------------------------------------------

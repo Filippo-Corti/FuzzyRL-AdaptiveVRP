@@ -33,7 +33,7 @@ CUSTOM_TONN_RESULTS_PATH = "datasets/custom/tonn_distance_results.pt" # Output p
 # Agent Configuration
 AGENT_MODE: Literal["transformer", "fuzzy"] = "transformer"         # "transformer" or "fuzzy"
 CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer.pt"          # Path to trained transformer agent checkpoint
-CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"                     # Path to trained fuzzy agent checkpoint (pickle file)
+CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy-3550.pkl"                     # Path to trained fuzzy agent checkpoint (pickle file)
 SEED = None                                                         # Set to an int for visualizing the same instance
 
 # Fuzzy agent hyperparameters (overridden if loading from checkpoint)
