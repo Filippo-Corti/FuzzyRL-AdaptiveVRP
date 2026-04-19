@@ -25,6 +25,7 @@ TESTSET_NODES = 30
 RESULTS_DIR = Path("tests")
 BOXPLOT_FIGSIZE = (4, 3.8)
 BOXPLOT_DPI = 1200
+SEED: int | None = 42
 
 
 class _PolicyAgent(Protocol):
@@ -243,4 +244,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    
+    
+    if SEED is not None:
+        torch.manual_seed(SEED)
+
     main()

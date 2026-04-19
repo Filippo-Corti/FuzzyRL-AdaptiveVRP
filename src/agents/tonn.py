@@ -23,7 +23,7 @@ class TONNAgent:
     def __init__(
         self,
         w_d: float = 1.0,
-        w_u: float = -0.8,
+        w_u: float = -2.0,
         w_f: float = 1.0,
         infeasible_penalty: float = 1e6,
     ):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from pathlib import Path
 
 import torch
@@ -13,7 +14,7 @@ from src.train.transformer_trainer import TransformerTrainer
 
 
 TRAINER_EPISODES = 5000
-TRAINER_BATCH_SIZE = 256
+TRANSFORMER_BATCH_SIZE = 256
 FUZZY_BATCH_SIZE = 512
 TRAINER_NUM_NODES = config.NUM_NODES
 TRAINER_LATENESS_ALPHA = 0.2
@@ -21,6 +22,49 @@ TRAINER_GRAD_CLIP_NORM = 1.0
 TRAINER_SAVE_EVERY = 25
 TRAINER_TORCH_THREADS = 1
 TRAINER_SEED: int | None = None
+
+
+def _prepare_metrics_csv(checkpoint_path: Path) -> Path:
+    csv_path = checkpoint_path.with_name(f"{checkpoint_path.stem}-metrics.csv")
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not csv_path.exists() or csv_path.stat().st_size == 0:
+        with csv_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    "episode",
+                    "advantage_mean",
+                    "baseline_cost_mean",
+                    "sampled_cost_mean",
+                    "entropy_mean",
+                    "tonn_cost_mean",
+                    "sampled_minus_tonn",
+                ]
+            )
+
+    return csv_path
+
+
+def _log_episode_metrics(csv_path: Path, metrics: dict[str, float]) -> None:
+    tonn_cost_mean = metrics.get("tonn_cost_mean", "")
+    sampled_minus_tonn : float | str | None = metrics.get("sampled_minus_tonn")
+    if sampled_minus_tonn is None:
+        sampled_minus_tonn = metrics.get("sampled_minus_tonn_mean", "")
+
+    with csv_path.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                int(metrics["episode"]),
+                float(metrics["advantage_mean"]),
+                float(metrics["baseline_cost_mean"]),
+                float(metrics["sampled_cost_mean"]),
+                float(metrics["entropy_mean"]),
+                tonn_cost_mean,
+                sampled_minus_tonn,
+            ]
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +86,7 @@ def parse_args() -> argparse.Namespace:
 
 def train_fuzzy(episodes: int, device: torch.device) -> None:
     checkpoint_path = Path(config.CHECKPOINT_FUZZY_PATH)
+    metrics_csv_path = _prepare_metrics_csv(checkpoint_path)
     if checkpoint_path.exists():
         trainer = FuzzyTrainer.load_checkpoint(
             path=checkpoint_path,
@@ -76,6 +121,8 @@ def train_fuzzy(episodes: int, device: torch.device) -> None:
             compare_with_tonn=should_compare,
         )
 
+        _log_episode_metrics(metrics_csv_path, metrics)
+
         print(
             f"Episode {int(metrics['episode']):5d} | "
             f"adv={metrics['advantage_mean']:.4f} | "
@@ -104,6 +151,7 @@ def train_fuzzy(episodes: int, device: torch.device) -> None:
 
 def train_transformer(episodes: int, device: torch.device) -> None:
     checkpoint_path = Path(config.CHECKPOINT_TRANSFORMER_PATH)
+    metrics_csv_path = _prepare_metrics_csv(checkpoint_path)
     if checkpoint_path.exists():
         trainer = TransformerTrainer.load_checkpoint(
             path=checkpoint_path,
@@ -132,16 +180,18 @@ def train_transformer(episodes: int, device: torch.device) -> None:
 
     print(
         f"Training Transformer for {episodes} episodes "
-        f"(batch={TRAINER_BATCH_SIZE}, nodes={TRAINER_NUM_NODES}, device={device})"
+        f"(batch={TRANSFORMER_BATCH_SIZE}, nodes={TRAINER_NUM_NODES}, device={device})"
     )
 
     for _ in range(episodes):
         should_compare = (trainer.episode + 1) % int(TRAINER_SAVE_EVERY) == 0
         metrics = trainer.train_episode(
-            batch_size=TRAINER_BATCH_SIZE,
+            batch_size=TRANSFORMER_BATCH_SIZE,
             num_nodes=TRAINER_NUM_NODES,
             compare_with_tonn=should_compare,
         )
+
+        _log_episode_metrics(metrics_csv_path, metrics)
 
         print(
             f"Episode {int(metrics['episode']):5d} | "
