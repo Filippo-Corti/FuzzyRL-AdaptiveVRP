@@ -1,5 +1,5 @@
 from typing import Literal
-
+ 
 # Core instance-generation parameters used across src/train and src/ui
 NUM_NODES = 30
 ENV_DEPOT_MODE: Literal["center", "random"] = "center"
@@ -13,7 +13,7 @@ ENV_OUTLIER_COUNT_RANGE = (2, 7)
 ENV_CLUSTER_STD_RANGE = (0.05, 0.14)
 
 # Agent and trainer configuration used by src/agents and src/train
-CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer-1000.pt"
+CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer-1000-3050.pt"
 CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"
 TRANSFORMER_NODE_FEATURES = 6
 TRANSFORMER_STATE_FEATURES = 4
