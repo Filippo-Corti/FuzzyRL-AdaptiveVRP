@@ -121,13 +121,13 @@ class FuzzyAgent(nn.Module):
        (B, N+1) priority logits.
     4. Mask invalid actions and return logits.
 
-    Features (all normalised to [0, 1])
+    Features (all normalised to [0, 1] except urgency)
     ────────────────────────────────────
-    0  distance       — Euclidean distance from truck to candidate / sqrt(2)
-    1  urgency        — time_since_arrival / window_length  (from node_features)
-    2  demand_ratio   — candidate demand / remaining truck capacity
-    3  cluster_density— fraction of unvisited nodes within CLUSTER_RADIUS
-    4  detour_cost    — (d_current→node + d_node→depot − d_current→depot) / mean_d, clipped [0,1]
+    0  distance        — Euclidean distance from truck to candidate / sqrt(2)
+    1  urgency         — time_since_arrival / window_length  (from node_features)
+    2  demand_ratio    — candidate demand / remaining truck capacity
+    3  cluster_density — fraction of unvisited nodes within CLUSTER_RADIUS
+    4  detour_cost     — (d_current→node + d_node→depot − d_current→depot) / mean_d, clipped [0,1]
 
     Rule weights are initialised so that semantically good actions score
     higher: near > far, urgent > not urgent, dense cluster > sparse, cheap
