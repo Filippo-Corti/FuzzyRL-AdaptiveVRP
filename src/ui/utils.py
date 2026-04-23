@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import torch
 
@@ -72,3 +74,55 @@ def plot_metrics_comparison(
     plt.legend(loc="best")
     plt.tight_layout()
     plt.show()
+
+
+def plot_learning_curves(
+    curves: dict[str, tuple[torch.Tensor, torch.Tensor]],
+    title: str = "Learning curve",
+    x_label: str = "Episode",
+    y_label: str = "Metric value",
+    output_path: str | Path | None = None,
+    show: bool = True,
+    title_fontsize: int = 30,
+    label_fontsize: int = 24,
+    tick_fontsize: int = 20,
+    legend_fontsize: int = 20,
+) -> None:
+    """Plot one or more learning curves and optionally save to file."""
+    if not curves:
+        raise ValueError("curves must contain at least one named series")
+
+    plt.figure(figsize=(10, 5.5))
+
+    for name, (episodes, values) in curves.items():
+        if episodes.dim() != 1:
+            raise ValueError(f"episodes for '{name}' must be a 1D tensor")
+        if values.dim() != 1:
+            raise ValueError(f"values for '{name}' must be a 1D tensor")
+        if episodes.shape != values.shape:
+            raise ValueError(
+                f"episodes and values for '{name}' must have the same shape"
+            )
+
+        x = episodes.detach().cpu().numpy()
+        y = values.detach().cpu().numpy()
+        plt.plot(x, y, lw=1.5, label=name)
+
+    plt.title(title, fontsize=title_fontsize)
+    plt.xlabel(x_label, fontsize=label_fontsize)
+    plt.ylabel(y_label, fontsize=label_fontsize)
+    plt.xticks(fontsize=tick_fontsize)
+    plt.yticks(fontsize=tick_fontsize)
+    plt.grid(alpha=0.25)
+    plt.legend(loc="best", fontsize=legend_fontsize)
+    plt.tight_layout()
+
+    if output_path is not None:
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(path, bbox_inches="tight", format="pdf", dpi=1200)
+
+    if show:
+        plt.show()
+
+    plt.close()

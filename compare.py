@@ -25,7 +25,10 @@ TESTSET_NODES = 30
 RESULTS_DIR = Path("tests")
 BOXPLOT_FIGSIZE = (4, 3.8)
 BOXPLOT_DPI = 1200
-SEED: int | None = 42
+BOXPLOT_TITLE_FONTSIZE = 20
+BOXPLOT_LABEL_FONTSIZE = 13
+BOXPLOT_TICK_FONTSIZE = 13
+SEED: int | None = 0
 
 
 class _PolicyAgent(Protocol):
@@ -75,10 +78,17 @@ def _evaluate_agent(
     distance = env.total_distance.detach().to(dtype=torch.float32, device="cpu")
     combined = distance + lateness_penalty_alpha * lateness
 
+    distance_mean = distance.mean().item()
+    distance_std = distance.std(unbiased=False).item()
+    lateness_mean = lateness.mean().item()
+    lateness_std = lateness.std(unbiased=False).item()
+    combined_mean = combined.mean().item()
+    combined_std = combined.std(unbiased=False).item()
+
     print(
-        f"[{name}] mean_distance={distance.mean().item():.4f} "
-        f"mean_lateness={lateness.mean().item():.4f} "
-        f"mean_combined={combined.mean().item():.4f}"
+        f"[{name}] distance={distance_mean:.4f}+/-{distance_std:.4f} "
+        f"lateness={lateness_mean:.4f}+/-{lateness_std:.4f} "
+        f"combined={combined_mean:.4f}+/-{combined_std:.4f}"
     )
 
     return {
@@ -116,11 +126,13 @@ def _save_boxplot(
         patch.set_alpha(0.35)
 
     ax.set_xticks(range(1, len(labels) + 1), labels)
-    ax.set_title(title)
-    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=BOXPLOT_TITLE_FONTSIZE)
+    ax.set_ylabel(ylabel, fontsize=BOXPLOT_LABEL_FONTSIZE)
+    ax.tick_params(axis="x", labelsize=BOXPLOT_TICK_FONTSIZE)
+    ax.tick_params(axis="y", labelsize=BOXPLOT_TICK_FONTSIZE)
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(output_path, dpi=BOXPLOT_DPI, bbox_inches="tight")
+    fig.savefig(output_path, dpi=BOXPLOT_DPI, bbox_inches="tight", format="pdf")
     plt.close(fig)
 
 
@@ -135,6 +147,42 @@ def _run_wilcoxon_pairwise(combined_by_agent: dict[str, torch.Tensor]) -> None:
         y = combined_by_agent[b]
         res = wilcoxon(x, y, zero_method="wilcox")
         print(f"- {a} vs {b}: p={res.pvalue:.6g}")
+
+
+def _run_percentage_improvement_pairwise(
+    combined_by_agent: dict[str, torch.Tensor],
+) -> None:
+    labels = list(combined_by_agent.keys())
+    if len(labels) < 2:
+        return
+
+    means = {
+        label: combined_by_agent[label].mean().item()
+        for label in labels
+    }
+
+    print("\nPairwise percentage improvement (combined metric, lower is better):")
+    for a, b in itertools.combinations(labels, 2):
+        mean_a = means[a]
+        mean_b = means[b]
+
+        if mean_a <= mean_b:
+            better_name, better_mean = a, mean_a
+            worse_name, worse_mean = b, mean_b
+        else:
+            better_name, better_mean = b, mean_b
+            worse_name, worse_mean = a, mean_a
+
+        if worse_mean == 0.0:
+            improvement_str = "inf" if better_mean < 0.0 else "0.00"
+        else:
+            improvement = (worse_mean - better_mean) / worse_mean * 100.0
+            improvement_str = f"{improvement:.2f}"
+
+        print(
+            f"- {better_name} is better than {worse_name} by {improvement_str}% "
+            f"(mean {better_mean:.4f} vs {worse_mean:.4f})"
+        )
 
 
 def main() -> None:
@@ -222,22 +270,23 @@ def main() -> None:
     _save_boxplot(
         values_by_agent=combined_by_agent,
         ylabel="Combined cost",
-        title=f"Combined cost boxplot (distance + {LATENESS_ALPHA} * lateness)",
-        output_path=RESULTS_DIR / "boxplot_combined_cost.png",
+        title=f"Costs Comparison",
+        output_path=RESULTS_DIR / "boxplot_combined_cost.pdf",
     )
     _save_boxplot(
         values_by_agent=lateness_by_agent,
         ylabel="Lateness",
         title="Lateness boxplot",
-        output_path=RESULTS_DIR / "boxplot_lateness.png",
+        output_path=RESULTS_DIR / "boxplot_lateness.pdf",
     )
     _save_boxplot(
         values_by_agent=distance_by_agent,
         ylabel="Distance",
         title="Distance boxplot",
-        output_path=RESULTS_DIR / "boxplot_distance.png",
+        output_path=RESULTS_DIR / "boxplot_distance.pdf",
     )
 
+    _run_percentage_improvement_pairwise(combined_by_agent=combined_by_agent)
     _run_wilcoxon_pairwise(combined_by_agent=combined_by_agent)
 
     print(f"Saved boxplots in {RESULTS_DIR.resolve()}")

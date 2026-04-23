@@ -14,7 +14,7 @@ ENV_CLUSTER_STD_RANGE = (0.05, 0.14)
 
 # Agent and trainer configuration used by src/agents and src/train
 CHECKPOINT_TRANSFORMER_PATH = "checkpoints/transformer-1000-3050.pt"
-CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy.pkl"
+CHECKPOINT_FUZZY_PATH = "checkpoints/fuzzy-3775-7300.pkl"
 TRANSFORMER_NODE_FEATURES = 6
 TRANSFORMER_STATE_FEATURES = 4
 TRANSFORMER_D_MODEL = 128

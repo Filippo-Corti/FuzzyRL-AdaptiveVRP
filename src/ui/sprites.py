@@ -124,7 +124,7 @@ class VisualizationSprites:
             elif not is_visible:
                 color = (216, 216, 216)
             else:
-                color = (244, 244, 244)
+                color = (0, 0, 255)
 
             if VisualizationSprites._fancy_mode:
                 sprite = VisualizationSprites._get_tinted_house(color)
@@ -191,8 +191,8 @@ class VisualizationSprites:
             (depot_sx, depot_sy + 10),
             (depot_sx - 9, depot_sy),
         ]
-        pygame.draw.polygon(surface, (235, 235, 235), depot_shape)
-        pygame.draw.polygon(surface, (158, 158, 158), depot_shape, width=2)
+        pygame.draw.polygon(surface, (255, 0, 0), depot_shape)
+        pygame.draw.polygon(surface, (255, 0, 0), depot_shape, width=2)
 
     @staticmethod
     def draw_truck(
@@ -234,5 +234,5 @@ class VisualizationSprites:
             pygame.draw.rect(surface, (95, 95, 95), bar_rect, width=1, border_radius=2)
             return
 
-        pygame.draw.circle(surface, (248, 248, 248), (truck_sx, truck_sy), 8)
-        pygame.draw.circle(surface, (118, 118, 118), (truck_sx, truck_sy), 8, width=2)
+        #pygame.draw.circle(surface, (248, 248, 248), (truck_sx, truck_sy), 8)
+        #pygame.draw.circle(surface, (118, 118, 118), (truck_sx, truck_sy), 8, width=2)
