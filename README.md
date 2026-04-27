@@ -46,7 +46,7 @@ Results showed that the neuro-fuzzy agent improves upon the heuristic baseline b
   python main.py # Runs visualization
   ```
   ```bash
-  python train.py --agent [fuzzy/transformer] # Runs training
+  python train.py --agent [fuzzy|transformer] # Runs training
   ```
   ```bash
   python compare.py [--tonn] [--fuzzy checkpoints/fuzzy-12000] [--transformer checkpoints/transformer-4000]  # Runs test comparison
