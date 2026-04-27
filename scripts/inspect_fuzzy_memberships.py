@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("tests"),
+        default=Path("img"),
         help="Directory where PDF plots will be saved.",
     )
     parser.add_argument(
