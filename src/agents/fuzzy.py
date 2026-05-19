@@ -8,20 +8,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-# ---------------------------------------------------------------------------
-# IMPORTANT: truck_state layout assumptions.
-# The FuzzyAgent indexes into truck_state with these positions:
-#   [0] = current truck x position, normalised [0, 1]
-#   [1] = current truck y position, normalised [0, 1]
-#   [2] = remaining capacity fraction  (W_remaining / W_total), in [0, 1]
-# Verify these match your VRPEnvironmentBatch.get_observation() output.
-# ---------------------------------------------------------------------------
-
-# node_features layout assumptions (same as Transformer):
-#   [0] = x, [1] = y, [2] = demand (normalised), [3] = urgency,
-#   [4] = visited flag, [5] = is_depot flag
-
 _TRUCK_X_IDX = 0
 _TRUCK_Y_IDX = 1
 _TRUCK_CAP_IDX = 2
